@@ -67,9 +67,8 @@ atlas/
 ### 1. Start backend
 
 ```bash
-cd server
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+make install-server-dev
+make run-server
 ```
 
 ### 2. Start frontend
