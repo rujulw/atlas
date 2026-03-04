@@ -9,7 +9,7 @@ UVICORN_APP ?= app.main:app
 HOST ?= 127.0.0.1
 PORT ?= 8000
 
-.PHONY: help install-server install-server-dev run-server test-server lint-server format-server typecheck-server clean
+.PHONY: help install-server install-server-dev run-server test-server lint-server format-server typecheck-server db-upgrade db-downgrade clean
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "\nAtlas development commands\n\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-24s %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
@@ -35,6 +35,12 @@ format-server: ## Format backend code
 
 typecheck-server: ## Run backend type checks
 	cd $(SERVER_DIR) && $(PYTHON) -m mypy app
+
+db-upgrade: ## Run latest database migrations
+	cd $(SERVER_DIR) && $(PYTHON) -m alembic -c migrations/alembic.ini upgrade head
+
+db-downgrade: ## Roll back one database migration
+	cd $(SERVER_DIR) && $(PYTHON) -m alembic -c migrations/alembic.ini downgrade -1
 
 clean: ## Remove common local caches
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +

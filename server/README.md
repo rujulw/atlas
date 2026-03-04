@@ -24,3 +24,5 @@ Useful commands:
 - `make lint-server`
 - `make format-server`
 - `make typecheck-server`
+- `make db-upgrade`
+- `make db-downgrade`
