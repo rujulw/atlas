@@ -79,3 +79,24 @@
   - Add route guard coverage to integration tests across register/login/protected failures
   - Introduce user lookup in guard once login is backed by persisted credentials
 - References: `server/app/api/routes/auth.py`, `server/app/services/auth.py`, `server/tests/api/v1/test_auth.py`
+
+## 5. File metadata schema and storage constraints baseline
+- Status: accepted
+- Area: backend
+- Decision: define a metadata-first `files` schema plus strict storage path and ownership constraints before implementing upload/download endpoints.
+- Context: storage APIs need an explicit contract for path generation, ownership checks, and integrity metadata to avoid implicit behavior changes across later commits.
+- Options considered:
+  - Option A: implement upload/download first and derive schema from endpoint behavior
+  - Option B: define schema and constraints first, then implement endpoints against that contract
+- Tradeoffs:
+  - Pros:
+    - Reduces migration churn by agreeing on table fields and constraints early
+    - Prevents path traversal and ownership bugs caused by ad-hoc storage keys
+  - Cons:
+    - Requires upfront modeling work before visible API features land
+- Outcome: v1 storage design now specifies `files` metadata columns (`owner_id`, `storage_key`, `size_bytes`, `checksum_sha256`, timestamps, soft-delete) and enforcement constraints (owner-scoped access, server-generated keys, root-scoped disk access).
+- Follow-up actions:
+  - Add SQLAlchemy `File` model and Alembic migration
+  - Introduce storage service interfaces for key generation, write/read, and metadata persistence
+  - Add API tests for upload/download ownership and invalid-path access
+- References: `docs/architecture.md`, `server/app/models/user.py`, `commits.txt`

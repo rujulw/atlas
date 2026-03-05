@@ -107,6 +107,32 @@ File contents are stored directly on disk while the database tracks:
 
 This allows large files to be stored efficiently without database overhead.
 
+### File Metadata Schema (Planned v1)
+
+The first storage metadata slice will introduce a `files` table with the following fields:
+
+- `id`: integer primary key
+- `owner_id`: foreign key to `users.id`, indexed, non-null
+- `original_name`: client-provided filename, non-null
+- `storage_key`: server-generated relative storage path key, unique, non-null
+- `mime_type`: optional MIME type from upload metadata
+- `size_bytes`: file size in bytes, non-null
+- `checksum_sha256`: content checksum, non-null
+- `is_deleted`: soft-delete flag, non-null default `false`
+- `created_at`: timestamp with timezone, server default `now()`, non-null
+- `updated_at`: timestamp with timezone, server default `now()`, non-null
+
+### Storage Constraints (Planned v1)
+
+Storage behavior for upload/download flows is constrained by the following rules:
+
+- Path ownership: every file metadata row is scoped to `owner_id`; API reads must enforce owner match.
+- Path safety: `storage_key` is server-generated and must never be accepted directly from user input.
+- Disk scope: all file writes/reads must stay under a configured storage root directory.
+- Integrity: `size_bytes` and `checksum_sha256` are stored at upload time and used for validation/diagnostics.
+- Immutability baseline: file content is immutable in v1; updates are represented as new file records.
+- Delete behavior: initial delete support is soft-delete (`is_deleted=true`) to preserve auditability.
+
 ## Synchronization Model
 
 Atlas uses an API-driven synchronization model.

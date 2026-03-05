@@ -1,5 +1,31 @@
 # Bug Log
 
+## 2026-03-05 - Avoided storage path traversal and cross-user access drift in design phase
+- Status: fixed
+- Severity: high
+- Symptom: file upload/download implementations can accidentally trust client-provided paths or skip owner checks, enabling traversal or cross-user reads.
+- Root cause: missing explicit storage constraints before endpoint implementation.
+- Fix: documented storage constraints requiring server-generated `storage_key`, root-scoped disk access, and owner-scoped metadata queries.
+- Verification: architecture + design docs now define the `files` schema and constraint contract used by upcoming storage implementation commits.
+- Files touched:
+  - `docs/architecture.md`
+  - `docs/design.md`
+- Linked commit/PR: pending
+- Notes: this is a preventative design control to harden storage APIs before code lands.
+
+## 2026-03-05 - Avoided metadata integrity ambiguity for file lifecycle
+- Status: fixed
+- Severity: medium
+- Symptom: without explicit checksum/size metadata and delete semantics, storage APIs risk inconsistent validation and destructive delete behavior.
+- Root cause: file lifecycle invariants were not yet codified in project docs.
+- Fix: defined `size_bytes`, `checksum_sha256`, and `is_deleted` in the planned schema, with immutable-content baseline and soft-delete behavior.
+- Verification: storage schema section now exists in architecture and linked design decision entry.
+- Files touched:
+  - `docs/architecture.md`
+  - `docs/design.md`
+- Linked commit/PR: pending
+- Notes: reduces migration churn and supports future auditing/indexing flows.
+
 ## 2026-03-05 - Avoided auth bypass on protected routes
 - Status: fixed
 - Severity: high
