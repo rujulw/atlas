@@ -1,3 +1,6 @@
+import base64
+import json
+
 from fastapi.testclient import TestClient
 
 from app.api.routes.auth import get_user_repository
@@ -28,7 +31,13 @@ class FakeUserRepository:
         return user
 
 
-def test_login_returns_stub_token() -> None:
+def _decode_base64url(value: str) -> dict[str, str | int]:
+    padded = value + "=" * (-len(value) % 4)
+    raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+    return json.loads(raw.decode("utf-8"))
+
+
+def test_login_returns_jwt_token() -> None:
     response = client.post(
         "/api/v1/auth/login",
         json={"email": "user@example.com", "password": "password123"},
@@ -36,7 +45,16 @@ def test_login_returns_stub_token() -> None:
 
     assert response.status_code == 200
     assert response.json()["token_type"] == "bearer"
-    assert response.json()["access_token"].startswith("stub-token-for")
+    token = response.json()["access_token"]
+    token_parts = token.split(".")
+    assert len(token_parts) == 3
+    header = _decode_base64url(token_parts[0])
+    payload = _decode_base64url(token_parts[1])
+    assert header == {"alg": "HS256", "typ": "JWT"}
+    assert payload["sub"] == "user@example.com"
+    assert isinstance(payload["iat"], int)
+    assert isinstance(payload["exp"], int)
+    assert payload["exp"] > payload["iat"]
 
 
 def test_register_persists_user() -> None:
