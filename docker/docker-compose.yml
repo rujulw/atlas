@@ -1,0 +1,62 @@
+name: atlas
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: atlas-db
+    environment:
+      POSTGRES_DB: atlas
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas -d atlas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  server:
+    build:
+      context: ..
+      dockerfile: docker/server.Dockerfile
+    container_name: atlas-server
+    environment:
+      DATABASE_URL: postgresql+psycopg://atlas:atlas@db:5432/atlas
+      SECRET_KEY: dev-secret-key
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../server:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python -m pip install -r requirements-dev.txt &&
+      python -m alembic -c migrations/alembic.ini upgrade head &&
+      python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  client:
+    build:
+      context: ..
+      dockerfile: docker/client.Dockerfile
+    container_name: atlas-client
+    environment:
+      VITE_API_URL: http://localhost:8000
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../client:/app
+      - client_node_modules:/app/node_modules
+    depends_on:
+      - server
+    command: >
+      sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+
+volumes:
+  postgres_data:
+  client_node_modules:

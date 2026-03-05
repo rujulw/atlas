@@ -79,6 +79,22 @@ npm install
 npm run dev
 ```
 
+## Docker Development Stack
+
+Run the full local stack (PostgreSQL, backend, frontend):
+
+```bash
+make docker-up
+```
+
+Useful diagnostics:
+
+```bash
+make docker-ps
+make docker-health
+make docker-logs
+```
+
 ## Environment Variables
 
 ### Server (`server/.env`)

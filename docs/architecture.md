@@ -45,6 +45,25 @@ Container definitions and deployment configurations.
 
 All components run inside containers and communicate through internal Docker networking.
 
+## Local Container Topology
+
+Development stack uses `docker/docker-compose.yml` with three services:
+
+- `db`: PostgreSQL metadata store (`5432`)
+- `server`: FastAPI backend (`8000`)
+- `client`: Vite/React frontend (`5173`)
+
+The backend waits for database health before startup and applies migrations on boot.
+Frontend depends on backend availability and targets `VITE_API_URL=http://localhost:8000`.
+
+### Runtime Diagnostics
+
+Operational diagnostics are exposed through:
+
+- `make docker-ps` for service state
+- `make docker-logs` for aggregated service logs
+- `make docker-health` for quick API liveness verification
+
 ## Frontend (`client`)
 
 The frontend is a lightweight web application responsible for:

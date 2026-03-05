@@ -18,6 +18,15 @@ Baseline features include:
 - API structure
 - Local storage system
 
+Current baseline progress (completed):
+
+- API versioned routing and health endpoint
+- PostgreSQL + Alembic migration baseline
+- Auth domain stubs and login/register API placeholders
+- React + Vite + TypeScript client bootstrap
+- Client integration to backend health/auth stubs
+- Dockerized local development stack with diagnostics
+
 ## 1. Core Backend
 
 Implement core infrastructure:
@@ -60,6 +69,15 @@ Add operational tooling for monitoring:
 - Performance monitoring
 
 These features prepare Atlas for long-running production deployments.
+
+## Next Priority Slice
+
+Near-term implementation priorities after current baseline:
+
+- Replace auth stubs with real credential verification + token signing
+- Add persistent user creation flow and auth guard middleware
+- Introduce structured server logging for request tracing
+- Add CI checks for backend tests and frontend type/build validation
 
 ## Open-Source Delivery Model
 

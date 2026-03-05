@@ -10,8 +10,9 @@ NPM ?= npm
 UVICORN_APP ?= app.main:app
 HOST ?= 127.0.0.1
 PORT ?= 8000
+DOCKER_COMPOSE ?= docker compose -f docker/docker-compose.yml
 
-.PHONY: help install-server install-server-dev run-server test-server lint-server format-server typecheck-server db-upgrade db-downgrade install-client run-client build-client typecheck-client clean
+.PHONY: help install-server install-server-dev run-server test-server lint-server format-server typecheck-server db-upgrade db-downgrade install-client run-client build-client typecheck-client docker-up docker-down docker-ps docker-logs docker-health clean
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "\nAtlas development commands\n\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-24s %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
@@ -55,6 +56,22 @@ build-client: ## Build frontend bundle
 
 typecheck-client: ## Run frontend type checks
 	cd $(CLIENT_DIR) && $(NPM) exec tsc -b
+
+docker-up: ## Start full local stack (db + server + client)
+	$(DOCKER_COMPOSE) up -d --build
+
+docker-down: ## Stop local stack and remove containers
+	$(DOCKER_COMPOSE) down
+
+docker-ps: ## Show container status for local stack
+	$(DOCKER_COMPOSE) ps
+
+docker-logs: ## Tail logs for all local stack services
+	$(DOCKER_COMPOSE) logs -f --tail=200
+
+docker-health: ## Show quick runtime diagnostics for API and DB containers
+	$(DOCKER_COMPOSE) ps
+	curl -fsS http://localhost:8000/api/v1/health || true
 
 clean: ## Remove common local caches
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
