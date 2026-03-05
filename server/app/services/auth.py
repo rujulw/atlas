@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import binascii
+import base64
 import json
 import hashlib
 import hmac
@@ -16,13 +17,25 @@ class TokenService(Protocol):
     def issue_access_token(self, subject: str) -> str:
         """Create an access token for the provided subject."""
 
+    def verify_access_token(self, token: str) -> str:
+        """Validate token and return its subject when valid."""
+
+
+class TokenValidationError(ValueError):
+    """Raised when access token validation fails."""
+
 
 def _utc_now() -> datetime:
     return datetime.now(tz=UTC)
 
 
 def _b64url_encode(data: bytes) -> str:
-    return binascii.b2a_base64(data, newline=False).decode("ascii").rstrip("=").replace("+", "-").replace("/", "_")
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(data: str) -> bytes:
+    padded = data + "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode(padded.encode("ascii"))
 
 
 @dataclass(frozen=True)
@@ -60,6 +73,44 @@ class JWTAccessTokenService:
         encoded_signature = _b64url_encode(signature)
 
         return f"{signing_input}.{encoded_signature}"
+
+    def verify_access_token(self, token: str) -> str:
+        token_parts = token.split(".")
+        if len(token_parts) != 3:
+            raise TokenValidationError("Invalid access token format.")
+
+        encoded_header, encoded_payload, encoded_signature = token_parts
+        signing_input = f"{encoded_header}.{encoded_payload}"
+
+        expected_signature = hmac.new(
+            self.secret_key.encode("utf-8"),
+            signing_input.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+        if not hmac.compare_digest(encoded_signature, _b64url_encode(expected_signature)):
+            raise TokenValidationError("Invalid access token signature.")
+
+        try:
+            header = json.loads(_b64url_decode(encoded_header).decode("utf-8"))
+            payload = json.loads(_b64url_decode(encoded_payload).decode("utf-8"))
+        except (ValueError, binascii.Error, json.JSONDecodeError) as exc:
+            raise TokenValidationError("Invalid access token payload.") from exc
+
+        if not isinstance(header, dict) or header.get("alg") != self.algorithm:
+            raise TokenValidationError("Invalid access token header.")
+
+        subject = payload.get("sub") if isinstance(payload, dict) else None
+        expires_at = payload.get("exp") if isinstance(payload, dict) else None
+        if not isinstance(subject, str) or not subject:
+            raise TokenValidationError("Invalid access token subject.")
+        if not isinstance(expires_at, int):
+            raise TokenValidationError("Invalid access token expiry.")
+
+        now = int(self.now_provider().timestamp())
+        if now >= expires_at:
+            raise TokenValidationError("Access token has expired.")
+
+        return subject
 
 
 class PasswordService(Protocol):
@@ -130,3 +181,11 @@ class StubTokenService:
     def issue_access_token(self, subject: str) -> str:
         sanitized_subject = subject.replace("@", "_at_")
         return f"{self.prefix}-{sanitized_subject}"
+
+    def verify_access_token(self, token: str) -> str:
+        token_prefix = f"{self.prefix}-"
+        if not token.startswith(token_prefix):
+            raise TokenValidationError("Invalid access token signature.")
+
+        sanitized_subject = token.removeprefix(token_prefix)
+        return sanitized_subject.replace("_at_", "@")

@@ -1,15 +1,23 @@
 """Authentication route stubs."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.core.config import settings
 from app.repositories.user import SQLAlchemyUserRepository, UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
-from app.services.auth import JWTAccessTokenService, PBKDF2PasswordService, PasswordService, TokenService
+from app.services.auth import (
+    JWTAccessTokenService,
+    PBKDF2PasswordService,
+    PasswordService,
+    TokenService,
+    TokenValidationError,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_token_service() -> TokenService:
@@ -25,6 +33,27 @@ def get_password_service() -> PasswordService:
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
     return SQLAlchemyUserRepository(db=db)
+
+
+def get_current_subject(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    token_service: TokenService = Depends(get_token_service),
+) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        return token_service.verify_access_token(credentials.credentials)
+    except TokenValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -57,3 +86,10 @@ async def register(
     )
 
     return {"detail": "User registered successfully."}
+
+
+@router.get("/me")
+async def read_current_user_email(
+    current_subject: str = Depends(get_current_subject),
+) -> dict[str, str]:
+    return {"email": current_subject}

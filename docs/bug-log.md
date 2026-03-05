@@ -1,5 +1,33 @@
 # Bug Log
 
+## 2026-03-05 - Avoided auth bypass on protected routes
+- Status: fixed
+- Severity: high
+- Symptom: protected endpoints could be implemented without consistent token checks, allowing accidental anonymous access.
+- Root cause: no shared auth guard dependency to enforce bearer validation at route boundaries.
+- Fix: added `get_current_subject` dependency with explicit bearer token requirement and JWT validation (`signature`, `exp`, `sub`).
+- Verification: `/api/v1/auth/me` returns `401` on missing/invalid token and `200` with authenticated subject for valid JWT.
+- Files touched:
+  - `server/app/api/routes/auth.py`
+  - `server/app/services/auth.py`
+  - `server/tests/api/v1/test_auth.py`
+  - `server/tests/unit/test_auth_token_service.py`
+- Linked commit/PR: pending
+- Notes: this is a preventative control that centralizes auth checks for future protected endpoints.
+
+## 2026-03-05 - Avoided JWT validation edge-case failures
+- Status: fixed
+- Severity: medium
+- Symptom: token parsing and validation can fail unpredictably if base64url padding, malformed payloads, or signature comparisons are handled loosely.
+- Root cause: JWT consumers commonly skip strict structure checks and constant-time signature verification.
+- Fix: added strict 3-part token parsing, base64url decode handling, header/claim validation, and `hmac.compare_digest` signature checks.
+- Verification: token service unit tests cover valid token verification and expired token rejection.
+- Files touched:
+  - `server/app/services/auth.py`
+  - `server/tests/unit/test_auth_token_service.py`
+- Linked commit/PR: pending
+- Notes: reduces production risk from malformed-token behavior and timing-attack-prone signature comparisons.
+
 ## 2026-03-05 - TypeScript initialization errors in client scaffold
 - Status: fixed
 - Severity: medium

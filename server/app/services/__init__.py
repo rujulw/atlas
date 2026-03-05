@@ -6,6 +6,7 @@ from app.services.auth import (
     PasswordService,
     StubTokenService,
     TokenService,
+    TokenValidationError,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "PasswordService",
     "PBKDF2PasswordService",
     "JWTAccessTokenService",
+    "TokenValidationError",
 ]
