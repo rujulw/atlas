@@ -142,3 +142,23 @@
   - Add list endpoint with owner filter and pagination
   - Add cleanup behavior for DB failure after file write (transactional reconciliation)
 - References: `server/app/api/routes/files.py`, `server/app/services/storage.py`, `server/app/repositories/file.py`, `server/app/schemas/file.py`
+
+## 8. Download endpoint with ownership and path-safety enforcement
+- Status: accepted
+- Area: backend
+- Decision: serve downloads only through owner-scoped metadata lookup and validated storage-key reads.
+- Context: download is the highest-risk storage read path; ownership checks and path safety must be hard requirements at route boundary.
+- Options considered:
+  - Option A: direct path-based download endpoint accepting storage key/path input
+  - Option B: id-based endpoint resolving metadata by `(file_id, owner_id)` and reading through blob service
+- Tradeoffs:
+  - Pros:
+    - Prevents cross-user file reads by binding lookup to authenticated owner
+    - Keeps filesystem access behind storage service path validation
+  - Cons:
+    - Requires extra metadata query before each file read
+- Outcome: `/api/v1/files/{file_id}/download` added with strict owner filter and not-found semantics for missing metadata/content.
+- Follow-up actions:
+  - Add integration tests for successful download, invalid ownership, and missing blob/content cases
+  - Add range/streaming support for large files in future media slice
+- References: `server/app/api/routes/files.py`, `server/app/repositories/file.py`, `server/app/services/storage.py`

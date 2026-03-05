@@ -88,6 +88,7 @@ The backend is responsible for:
 Current storage API surface:
 
 - `POST /api/v1/files/upload`: authenticated multipart upload with metadata persistence
+- `GET /api/v1/files/{file_id}/download`: authenticated file download with owner-scoped metadata lookup
 
 FastAPI provides the primary HTTP API.
 

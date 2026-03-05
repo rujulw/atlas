@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.file import File
@@ -21,6 +22,9 @@ class FileRepository(Protocol):
         mime_type: str | None = None,
     ) -> File:
         """Create and persist file metadata record."""
+
+    def get_by_id_for_owner(self, file_id: int, owner_id: int) -> File | None:
+        """Find active file metadata row by id and owner."""
 
 
 @dataclass
@@ -50,3 +54,11 @@ class SQLAlchemyFileRepository:
         self.db.commit()
         self.db.refresh(file_record)
         return file_record
+
+    def get_by_id_for_owner(self, file_id: int, owner_id: int) -> File | None:
+        statement = select(File).where(
+            File.id == file_id,
+            File.owner_id == owner_id,
+            File.is_deleted.is_(False),
+        )
+        return self.db.execute(statement).scalar_one_or_none()

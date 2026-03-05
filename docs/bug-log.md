@@ -1,5 +1,31 @@
 # Bug Log
 
+## 2026-03-05 - Avoided cross-user file read via metadata lookup scope
+- Status: fixed
+- Severity: high
+- Symptom: download endpoints can leak files if metadata lookup is done by file id only without owner scoping.
+- Root cause: missing owner-bound read method in file repository.
+- Fix: added `get_by_id_for_owner(file_id, owner_id)` and used it in download endpoint before blob reads.
+- Verification: download route now returns `404` when file id is not present for authenticated owner.
+- Files touched:
+  - `server/app/repositories/file.py`
+  - `server/app/api/routes/files.py`
+- Linked commit/PR: pending
+- Notes: forms the authorization baseline for upcoming storage listing/downloading behavior.
+
+## 2026-03-05 - Avoided unsafe path resolution in download response path
+- Status: fixed
+- Severity: high
+- Symptom: tampered or malformed storage keys can produce unsafe filesystem reads if route handlers bypass path validation.
+- Root cause: route-level direct file reads risk skipping storage root checks.
+- Fix: download path uses `BlobStorageService.read_bytes`, which validates resolved key paths under configured root and maps invalid paths to not-found responses.
+- Verification: download endpoint catches invalid-path and missing-file errors and returns controlled `404` responses.
+- Files touched:
+  - `server/app/api/routes/files.py`
+  - `server/app/services/storage.py`
+- Linked commit/PR: pending
+- Notes: prevents path traversal disclosure via storage metadata corruption or bad keys.
+
 ## 2026-03-05 - Avoided upload path injection via client filename
 - Status: fixed
 - Severity: high

@@ -3,11 +3,13 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.routes.auth import get_current_subject
 from app.core.config import settings
+from app.models.user import User
 from app.repositories.file import FileRepository, SQLAlchemyFileRepository
 from app.repositories.user import SQLAlchemyUserRepository, UserRepository
 from app.schemas.file import FileUploadResponse
@@ -37,6 +39,19 @@ def get_blob_storage_service() -> BlobStorageService:
     return LocalBlobStorageService(root_path=Path(settings.STORAGE_ROOT_PATH))
 
 
+def _resolve_current_user(
+    current_subject: str,
+    user_repository: UserRepository,
+) -> User:
+    user = user_repository.get_by_email(current_subject)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user not found.",
+        )
+    return user
+
+
 @router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = File(...),
@@ -46,12 +61,7 @@ async def upload_file(
     storage_key_service: StorageKeyService = Depends(get_storage_key_service),
     blob_storage_service: BlobStorageService = Depends(get_blob_storage_service),
 ) -> FileUploadResponse:
-    user = user_repository.get_by_email(current_subject)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authenticated user not found.",
-        )
+    user = _resolve_current_user(current_subject, user_repository)
 
     original_name = file.filename or "upload.bin"
     storage_key = storage_key_service.generate_storage_key(
@@ -88,4 +98,39 @@ async def upload_file(
         size_bytes=file_record.size_bytes,
         checksum_sha256=file_record.checksum_sha256,
         created_at=file_record.created_at,
+    )
+
+
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: int,
+    current_subject: str = Depends(get_current_subject),
+    user_repository: UserRepository = Depends(get_user_repository),
+    file_repository: FileRepository = Depends(get_file_repository),
+    blob_storage_service: BlobStorageService = Depends(get_blob_storage_service),
+) -> Response:
+    user = _resolve_current_user(current_subject, user_repository)
+    file_record = file_repository.get_by_id_for_owner(file_id=file_id, owner_id=user.id)
+    if file_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found.",
+        )
+
+    try:
+        file_bytes = blob_storage_service.read_bytes(file_record.storage_key)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File content not found.",
+        ) from None
+
+    content_disposition = f'attachment; filename="{file_record.original_name}"'
+    return Response(
+        content=file_bytes,
+        media_type=file_record.mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": content_disposition,
+            "X-Checksum-SHA256": file_record.checksum_sha256,
+        },
     )
