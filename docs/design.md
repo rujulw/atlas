@@ -162,3 +162,23 @@
   - Add integration tests for successful download, invalid ownership, and missing blob/content cases
   - Add range/streaming support for large files in future media slice
 - References: `server/app/api/routes/files.py`, `server/app/repositories/file.py`, `server/app/services/storage.py`
+
+## 9. Storage API integration coverage baseline
+- Status: accepted
+- Area: backend
+- Decision: enforce integration coverage for upload/download happy paths and ownership/content failure scenarios as a release gate for the storage-metadata branch.
+- Context: storage correctness depends on interactions across auth, metadata persistence, and filesystem behavior, which unit tests alone do not sufficiently validate.
+- Options considered:
+  - Option A: unit-test repositories/services only
+  - Option B: add API-level integration tests over an isolated DB + temporary storage root
+- Tradeoffs:
+  - Pros:
+    - Verifies end-to-end behavior for ownership checks and download response contracts
+    - Catches metadata/blob drift and missing-content regressions early
+  - Cons:
+    - Slightly higher test runtime and fixture setup complexity
+- Outcome: integration tests now cover upload persistence, owner download success, invalid-owner access (`404`), and missing blob/content (`404`).
+- Follow-up actions:
+  - Extend storage tests with malformed multipart payload and large-file streaming scenarios
+  - Add CI gate for storage integration suite in pull request checks
+- References: `server/tests/api/v1/test_files_integration.py`, `server/app/api/routes/files.py`

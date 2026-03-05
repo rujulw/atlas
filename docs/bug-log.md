@@ -1,5 +1,17 @@
 # Bug Log
 
+## 2026-03-05 - Debugged storage access control and missing-content edge paths via API integration suite
+- Status: fixed
+- Severity: high
+- Symptom: without end-to-end coverage, download ownership enforcement and missing-blob behavior can silently regress across route/repository/storage refactors.
+- Root cause: storage API behavior spanned multiple layers without explicit integration assertions for failure contracts.
+- Fix: added integration tests validating owner-only download success, invalid-owner `404`, and missing-content `404` behavior.
+- Verification: storage integration test module now exercises upload->download roundtrip plus ownership/content failure paths.
+- Files touched:
+  - `server/tests/api/v1/test_files_integration.py`
+- Linked commit/PR: pending
+- Notes: this is the quality gate for the storage metadata flow branch before listing/observability work.
+
 ## 2026-03-05 - Avoided cross-user file read via metadata lookup scope
 - Status: fixed
 - Severity: high
