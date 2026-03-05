@@ -60,7 +60,20 @@ def get_current_subject(
 async def login(
     payload: LoginRequest,
     token_service: TokenService = Depends(get_token_service),
+    user_repository: UserRepository = Depends(get_user_repository),
+    password_service: PasswordService = Depends(get_password_service),
 ) -> TokenResponse:
+    user = user_repository.get_by_email(payload.email)
+    if user is None or not password_service.verify_password(
+        payload.password,
+        user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     access_token = token_service.issue_access_token(subject=payload.email)
     return TokenResponse(access_token=access_token)
 
