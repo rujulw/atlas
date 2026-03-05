@@ -59,3 +59,23 @@
   - Replace stub token service with signed JWT implementation
   - Add persistence and password hashing flow
 - References: `server/app/api/routes/auth.py`, `server/app/services/auth.py`, `server/app/schemas/auth.py`
+
+## 4. Auth guard dependency for protected route access
+- Status: accepted
+- Area: backend
+- Decision: enforce JWT bearer token validation through a reusable dependency and apply it to protected routes.
+- Context: once JWT issuance exists, API endpoints need a shared enforcement path to prevent route-by-route auth drift.
+- Options considered:
+  - Option A: inline token checks in each protected route
+  - Option B: dependency-based guard using a shared token verification service
+- Tradeoffs:
+  - Pros:
+    - Single validation path for signature, expiry, and subject checks
+    - Clear 401 behavior contract (`WWW-Authenticate: Bearer`) for clients
+  - Cons:
+    - Slight indirection when reading route handlers
+- Outcome: `/api/v1/auth/me` now requires bearer auth and returns authenticated subject identity.
+- Follow-up actions:
+  - Add route guard coverage to integration tests across register/login/protected failures
+  - Introduce user lookup in guard once login is backed by persisted credentials
+- References: `server/app/api/routes/auth.py`, `server/app/services/auth.py`, `server/tests/api/v1/test_auth.py`
