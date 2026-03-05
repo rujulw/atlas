@@ -1,5 +1,33 @@
 # Bug Log
 
+## 2026-03-05 - Avoided orphaned or inconsistent file metadata records
+- Status: fixed
+- Severity: high
+- Symptom: storage metadata can drift from user ownership if file rows are created without foreign-key constraints and explicit schema guarantees.
+- Root cause: no concrete `files` table implementation existed yet to enforce relational integrity.
+- Fix: added `files` model and migration with `owner_id -> users.id` FK, unique `storage_key`, and non-negative size constraint.
+- Verification: migration `20260305_0003_create_files` defines table constraints and indexes aligned with storage design contract.
+- Files touched:
+  - `server/app/models/file.py`
+  - `server/app/models/__init__.py`
+  - `server/app/db/base.py`
+  - `server/migrations/versions/20260305_0003_create_files.py`
+- Linked commit/PR: pending
+- Notes: prevents downstream upload/download logic from persisting metadata that cannot be safely authorized.
+
+## 2026-03-05 - Avoided route-storage coupling before upload endpoint implementation
+- Status: fixed
+- Severity: medium
+- Symptom: upcoming upload/download route handlers risk direct filesystem coupling, making ownership/path safety rules hard to enforce consistently.
+- Root cause: missing explicit storage service contracts before endpoint implementation.
+- Fix: introduced storage protocol interfaces (`StorageKeyService`, `BlobStorageService`) and immutable write-result contract (`StoredFileObject`).
+- Verification: service contracts exist in `app/services/storage.py` and are exported for use by upcoming storage endpoints.
+- Files touched:
+  - `server/app/services/storage.py`
+  - `server/app/services/__init__.py`
+- Linked commit/PR: pending
+- Notes: this is a preventative architecture fix to keep storage behavior centralized and testable.
+
 ## 2026-03-05 - Avoided storage path traversal and cross-user access drift in design phase
 - Status: fixed
 - Severity: high

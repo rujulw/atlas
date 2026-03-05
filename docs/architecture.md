@@ -94,6 +94,11 @@ PostgreSQL stores structured metadata including:
 - Permissions
 - Indexing information
 
+Current implemented metadata tables:
+
+- `users`: authentication identity records
+- `files`: owner-scoped file metadata (name, storage key, checksum, size, and lifecycle flags)
+
 ## Storage Layer
 
 Atlas separates **file data** from **metadata**.
@@ -107,7 +112,7 @@ File contents are stored directly on disk while the database tracks:
 
 This allows large files to be stored efficiently without database overhead.
 
-### File Metadata Schema (Planned v1)
+### File Metadata Schema (Implemented Baseline)
 
 The first storage metadata slice will introduce a `files` table with the following fields:
 
@@ -122,7 +127,7 @@ The first storage metadata slice will introduce a `files` table with the followi
 - `created_at`: timestamp with timezone, server default `now()`, non-null
 - `updated_at`: timestamp with timezone, server default `now()`, non-null
 
-### Storage Constraints (Planned v1)
+### Storage Constraints (Implemented Baseline + Service Contracts)
 
 Storage behavior for upload/download flows is constrained by the following rules:
 
@@ -132,6 +137,7 @@ Storage behavior for upload/download flows is constrained by the following rules
 - Integrity: `size_bytes` and `checksum_sha256` are stored at upload time and used for validation/diagnostics.
 - Immutability baseline: file content is immutable in v1; updates are represented as new file records.
 - Delete behavior: initial delete support is soft-delete (`is_deleted=true`) to preserve auditability.
+- Service boundaries: storage interfaces separate key generation from binary I/O (`StorageKeyService`, `BlobStorageService`) before concrete implementations are added.
 
 ## Synchronization Model
 
@@ -167,7 +173,6 @@ Application-level authentication protects API endpoints.
 
 Current architecture does not yet include:
 
-- Full authentication implementation
 - Background worker system
 - File versioning
 - Observability stack

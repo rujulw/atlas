@@ -8,6 +8,7 @@ from app.services.auth import (
     TokenService,
     TokenValidationError,
 )
+from app.services.storage import BlobStorageService, StorageKeyService, StoredFileObject
 
 __all__ = [
     "TokenService",
@@ -16,4 +17,7 @@ __all__ = [
     "PBKDF2PasswordService",
     "JWTAccessTokenService",
     "TokenValidationError",
+    "StoredFileObject",
+    "StorageKeyService",
+    "BlobStorageService",
 ]

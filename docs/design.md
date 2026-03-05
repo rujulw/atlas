@@ -100,3 +100,24 @@
   - Introduce storage service interfaces for key generation, write/read, and metadata persistence
   - Add API tests for upload/download ownership and invalid-path access
 - References: `docs/architecture.md`, `server/app/models/user.py`, `commits.txt`
+
+## 6. File model + migration + storage interface boundary
+- Status: accepted
+- Area: backend
+- Decision: implement a concrete `files` metadata table and introduce storage service protocols before endpoint logic.
+- Context: upload/download endpoints require a stable persistence layer and storage abstraction to avoid coupling route code to filesystem details.
+- Options considered:
+  - Option A: implement storage endpoints first with inline filesystem code
+  - Option B: land model/migration/contracts first, then build endpoints on top
+- Tradeoffs:
+  - Pros:
+    - Ensures Alembic/database state is ready before API wiring
+    - Gives upload/download implementation a testable service seam
+  - Cons:
+    - Adds one intermediate commit before feature-visible endpoint behavior
+- Outcome: `File` model and `20260305_0003_create_files` migration added; storage contracts defined via `StorageKeyService`, `BlobStorageService`, and `StoredFileObject`.
+- Follow-up actions:
+  - Implement concrete local-disk storage service with safe key generation
+  - Add upload endpoint that writes bytes and persists metadata rows
+  - Add ownership checks for download access path
+- References: `server/app/models/file.py`, `server/migrations/versions/20260305_0003_create_files.py`, `server/app/services/storage.py`
