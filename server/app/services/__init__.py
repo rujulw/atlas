@@ -8,7 +8,13 @@ from app.services.auth import (
     TokenService,
     TokenValidationError,
 )
-from app.services.storage import BlobStorageService, StorageKeyService, StoredFileObject
+from app.services.storage import (
+    BlobStorageService,
+    LocalBlobStorageService,
+    StorageKeyService,
+    StoredFileObject,
+    UUIDStorageKeyService,
+)
 
 __all__ = [
     "TokenService",
@@ -20,4 +26,6 @@ __all__ = [
     "StoredFileObject",
     "StorageKeyService",
     "BlobStorageService",
+    "UUIDStorageKeyService",
+    "LocalBlobStorageService",
 ]

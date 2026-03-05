@@ -85,6 +85,10 @@ The backend is responsible for:
 - Indexing services
 - System monitoring
 
+Current storage API surface:
+
+- `POST /api/v1/files/upload`: authenticated multipart upload with metadata persistence
+
 FastAPI provides the primary HTTP API.
 
 PostgreSQL stores structured metadata including:

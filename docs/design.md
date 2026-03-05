@@ -121,3 +121,24 @@
   - Add upload endpoint that writes bytes and persists metadata rows
   - Add ownership checks for download access path
 - References: `server/app/models/file.py`, `server/migrations/versions/20260305_0003_create_files.py`, `server/app/services/storage.py`
+
+## 7. Upload endpoint with metadata-first persistence
+- Status: accepted
+- Area: backend
+- Decision: implement authenticated multipart upload as a composed flow: resolve authenticated owner -> generate server storage key -> write bytes -> persist file metadata row -> return metadata response.
+- Context: upload is the first storage API touching both disk and database, so behavior must preserve ownership and integrity guarantees from prior design commits.
+- Options considered:
+  - Option A: write bytes in route and inline metadata logic
+  - Option B: route orchestration over repository + storage services with explicit response schema
+- Tradeoffs:
+  - Pros:
+    - Keeps endpoint logic thin and service boundaries reusable for download/listing
+    - Preserves one source of truth for checksum/size via storage write result
+  - Cons:
+    - Adds dependency wiring complexity in route module
+- Outcome: `/api/v1/files/upload` added with JWT auth enforcement and metadata persistence into `files` table.
+- Follow-up actions:
+  - Add download endpoint with owner check and storage read path
+  - Add list endpoint with owner filter and pagination
+  - Add cleanup behavior for DB failure after file write (transactional reconciliation)
+- References: `server/app/api/routes/files.py`, `server/app/services/storage.py`, `server/app/repositories/file.py`, `server/app/schemas/file.py`

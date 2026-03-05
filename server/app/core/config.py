@@ -12,6 +12,7 @@ class Settings:
     DATABASE_URL: str
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
+    STORAGE_ROOT_PATH: str
 
 
 settings = Settings(
@@ -21,4 +22,5 @@ settings = Settings(
     DATABASE_URL=os.getenv("DATABASE_URL", "postgresql+psycopg://atlas:atlas@localhost:5432/atlas"),
     SECRET_KEY=os.getenv("SECRET_KEY", "change-me"),
     ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
+    STORAGE_ROOT_PATH=os.getenv("STORAGE_ROOT_PATH", "/tmp/atlas-storage"),
 )

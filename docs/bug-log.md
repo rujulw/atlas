@@ -1,5 +1,32 @@
 # Bug Log
 
+## 2026-03-05 - Avoided upload path injection via client filename
+- Status: fixed
+- Severity: high
+- Symptom: multipart uploads can accidentally use user-controlled filenames as storage paths, enabling traversal or unsafe writes.
+- Root cause: missing server-side storage-key generation boundary in upload implementation.
+- Fix: upload route now relies on `StorageKeyService` (`UUIDStorageKeyService`) and local storage root validation before writes.
+- Verification: upload writes are keyed by generated owner-scoped storage keys; local blob storage rejects invalid resolved paths.
+- Files touched:
+  - `server/app/api/routes/files.py`
+  - `server/app/services/storage.py`
+- Linked commit/PR: pending
+- Notes: preventative control for forthcoming download path handling.
+
+## 2026-03-05 - Avoided metadata/blob divergence in upload flow
+- Status: fixed
+- Severity: medium
+- Symptom: upload handlers can return success without persisting integrity metadata, creating untraceable blobs.
+- Root cause: no structured upload response contract tied to persisted metadata.
+- Fix: added upload response schema and repository-backed metadata create path carrying `size_bytes`, `checksum_sha256`, and ownership.
+- Verification: upload endpoint returns persisted metadata fields after successful file write + DB insert flow.
+- Files touched:
+  - `server/app/api/routes/files.py`
+  - `server/app/repositories/file.py`
+  - `server/app/schemas/file.py`
+- Linked commit/PR: pending
+- Notes: download/list endpoints can now rely on metadata as canonical source.
+
 ## 2026-03-05 - Avoided orphaned or inconsistent file metadata records
 - Status: fixed
 - Severity: high
