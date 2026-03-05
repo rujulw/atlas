@@ -3,16 +3,63 @@
 from __future__ import annotations
 
 import binascii
+import json
 import hashlib
 import hmac
 import secrets
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from typing import Callable, Protocol
 
 
 class TokenService(Protocol):
     def issue_access_token(self, subject: str) -> str:
         """Create an access token for the provided subject."""
+
+
+def _utc_now() -> datetime:
+    return datetime.now(tz=UTC)
+
+
+def _b64url_encode(data: bytes) -> str:
+    return binascii.b2a_base64(data, newline=False).decode("ascii").rstrip("=").replace("+", "-").replace("/", "_")
+
+
+@dataclass(frozen=True)
+class JWTAccessTokenService:
+    """Issue signed JWT access tokens using HS256."""
+
+    secret_key: str
+    expires_minutes: int
+    algorithm: str = "HS256"
+    now_provider: Callable[[], datetime] = field(default=_utc_now)
+
+    def issue_access_token(self, subject: str) -> str:
+        now = self.now_provider()
+        expires_at = now + timedelta(minutes=self.expires_minutes)
+
+        header = {"alg": self.algorithm, "typ": "JWT"}
+        payload = {
+            "sub": subject,
+            "iat": int(now.timestamp()),
+            "exp": int(expires_at.timestamp()),
+        }
+
+        encoded_header = _b64url_encode(
+            json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        )
+        encoded_payload = _b64url_encode(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        )
+        signing_input = f"{encoded_header}.{encoded_payload}"
+        signature = hmac.new(
+            self.secret_key.encode("utf-8"),
+            signing_input.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+        encoded_signature = _b64url_encode(signature)
+
+        return f"{signing_input}.{encoded_signature}"
 
 
 class PasswordService(Protocol):

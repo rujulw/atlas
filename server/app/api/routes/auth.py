@@ -4,15 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.config import settings
 from app.repositories.user import SQLAlchemyUserRepository, UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
-from app.services.auth import PBKDF2PasswordService, PasswordService, StubTokenService, TokenService
+from app.services.auth import JWTAccessTokenService, PBKDF2PasswordService, PasswordService, TokenService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def get_token_service() -> TokenService:
-    return StubTokenService()
+    return JWTAccessTokenService(
+        secret_key=settings.SECRET_KEY,
+        expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+    )
 
 
 def get_password_service() -> PasswordService:
