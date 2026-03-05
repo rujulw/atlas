@@ -57,6 +57,39 @@ def test_login_returns_jwt_token() -> None:
     assert payload["exp"] > payload["iat"]
 
 
+def test_me_requires_bearer_token() -> None:
+    response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Missing bearer token."
+
+
+def test_me_rejects_invalid_token() -> None:
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid access token format."
+
+
+def test_me_returns_subject_from_valid_token() -> None:
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "user@example.com", "password": "password123"},
+    )
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"email": "user@example.com"}
+
+
 def test_register_persists_user() -> None:
     fake_user_repository = FakeUserRepository()
     app.dependency_overrides[get_user_repository] = lambda: fake_user_repository

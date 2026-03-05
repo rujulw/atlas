@@ -4,7 +4,9 @@ import hmac
 import json
 from datetime import UTC, datetime
 
-from app.services.auth import JWTAccessTokenService
+import pytest
+
+from app.services.auth import JWTAccessTokenService, TokenValidationError
 
 
 def _decode_base64url(value: str) -> dict[str, str | int]:
@@ -42,3 +44,36 @@ def test_issue_access_token_produces_signed_jwt() -> None:
         hashlib.sha256,
     ).digest()
     assert encoded_signature == _encode_base64url(expected_signature)
+
+
+def test_verify_access_token_returns_subject() -> None:
+    issued_at = datetime(2026, 3, 4, 12, 0, 0, tzinfo=UTC)
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        now_provider=lambda: issued_at,
+    )
+    token = token_service.issue_access_token(subject="user@example.com")
+
+    verified_subject = token_service.verify_access_token(token)
+
+    assert verified_subject == "user@example.com"
+
+
+def test_verify_access_token_rejects_expired_token() -> None:
+    issued_at = datetime(2026, 3, 4, 12, 0, 0, tzinfo=UTC)
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        now_provider=lambda: issued_at,
+    )
+    token = token_service.issue_access_token(subject="user@example.com")
+
+    validator = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        now_provider=lambda: datetime(2026, 3, 4, 12, 40, 0, tzinfo=UTC),
+    )
+
+    with pytest.raises(TokenValidationError, match="expired"):
+        validator.verify_access_token(token)
