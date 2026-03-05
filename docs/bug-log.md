@@ -1,5 +1,124 @@
 # Bug Log
 
+## 2026-03-05 - Debugged storage access control and missing-content edge paths via API integration suite
+- Status: fixed
+- Severity: high
+- Symptom: without end-to-end coverage, download ownership enforcement and missing-blob behavior can silently regress across route/repository/storage refactors.
+- Root cause: storage API behavior spanned multiple layers without explicit integration assertions for failure contracts.
+- Fix: added integration tests validating owner-only download success, invalid-owner `404`, and missing-content `404` behavior.
+- Verification: storage integration test module now exercises upload->download roundtrip plus ownership/content failure paths.
+- Files touched:
+  - `server/tests/api/v1/test_files_integration.py`
+- Linked commit/PR: pending
+- Notes: this is the quality gate for the storage metadata flow branch before listing/observability work.
+
+## 2026-03-05 - Avoided cross-user file read via metadata lookup scope
+- Status: fixed
+- Severity: high
+- Symptom: download endpoints can leak files if metadata lookup is done by file id only without owner scoping.
+- Root cause: missing owner-bound read method in file repository.
+- Fix: added `get_by_id_for_owner(file_id, owner_id)` and used it in download endpoint before blob reads.
+- Verification: download route now returns `404` when file id is not present for authenticated owner.
+- Files touched:
+  - `server/app/repositories/file.py`
+  - `server/app/api/routes/files.py`
+- Linked commit/PR: pending
+- Notes: forms the authorization baseline for upcoming storage listing/downloading behavior.
+
+## 2026-03-05 - Avoided unsafe path resolution in download response path
+- Status: fixed
+- Severity: high
+- Symptom: tampered or malformed storage keys can produce unsafe filesystem reads if route handlers bypass path validation.
+- Root cause: route-level direct file reads risk skipping storage root checks.
+- Fix: download path uses `BlobStorageService.read_bytes`, which validates resolved key paths under configured root and maps invalid paths to not-found responses.
+- Verification: download endpoint catches invalid-path and missing-file errors and returns controlled `404` responses.
+- Files touched:
+  - `server/app/api/routes/files.py`
+  - `server/app/services/storage.py`
+- Linked commit/PR: pending
+- Notes: prevents path traversal disclosure via storage metadata corruption or bad keys.
+
+## 2026-03-05 - Avoided upload path injection via client filename
+- Status: fixed
+- Severity: high
+- Symptom: multipart uploads can accidentally use user-controlled filenames as storage paths, enabling traversal or unsafe writes.
+- Root cause: missing server-side storage-key generation boundary in upload implementation.
+- Fix: upload route now relies on `StorageKeyService` (`UUIDStorageKeyService`) and local storage root validation before writes.
+- Verification: upload writes are keyed by generated owner-scoped storage keys; local blob storage rejects invalid resolved paths.
+- Files touched:
+  - `server/app/api/routes/files.py`
+  - `server/app/services/storage.py`
+- Linked commit/PR: pending
+- Notes: preventative control for forthcoming download path handling.
+
+## 2026-03-05 - Avoided metadata/blob divergence in upload flow
+- Status: fixed
+- Severity: medium
+- Symptom: upload handlers can return success without persisting integrity metadata, creating untraceable blobs.
+- Root cause: no structured upload response contract tied to persisted metadata.
+- Fix: added upload response schema and repository-backed metadata create path carrying `size_bytes`, `checksum_sha256`, and ownership.
+- Verification: upload endpoint returns persisted metadata fields after successful file write + DB insert flow.
+- Files touched:
+  - `server/app/api/routes/files.py`
+  - `server/app/repositories/file.py`
+  - `server/app/schemas/file.py`
+- Linked commit/PR: pending
+- Notes: download/list endpoints can now rely on metadata as canonical source.
+
+## 2026-03-05 - Avoided orphaned or inconsistent file metadata records
+- Status: fixed
+- Severity: high
+- Symptom: storage metadata can drift from user ownership if file rows are created without foreign-key constraints and explicit schema guarantees.
+- Root cause: no concrete `files` table implementation existed yet to enforce relational integrity.
+- Fix: added `files` model and migration with `owner_id -> users.id` FK, unique `storage_key`, and non-negative size constraint.
+- Verification: migration `20260305_0003_create_files` defines table constraints and indexes aligned with storage design contract.
+- Files touched:
+  - `server/app/models/file.py`
+  - `server/app/models/__init__.py`
+  - `server/app/db/base.py`
+  - `server/migrations/versions/20260305_0003_create_files.py`
+- Linked commit/PR: pending
+- Notes: prevents downstream upload/download logic from persisting metadata that cannot be safely authorized.
+
+## 2026-03-05 - Avoided route-storage coupling before upload endpoint implementation
+- Status: fixed
+- Severity: medium
+- Symptom: upcoming upload/download route handlers risk direct filesystem coupling, making ownership/path safety rules hard to enforce consistently.
+- Root cause: missing explicit storage service contracts before endpoint implementation.
+- Fix: introduced storage protocol interfaces (`StorageKeyService`, `BlobStorageService`) and immutable write-result contract (`StoredFileObject`).
+- Verification: service contracts exist in `app/services/storage.py` and are exported for use by upcoming storage endpoints.
+- Files touched:
+  - `server/app/services/storage.py`
+  - `server/app/services/__init__.py`
+- Linked commit/PR: pending
+- Notes: this is a preventative architecture fix to keep storage behavior centralized and testable.
+
+## 2026-03-05 - Avoided storage path traversal and cross-user access drift in design phase
+- Status: fixed
+- Severity: high
+- Symptom: file upload/download implementations can accidentally trust client-provided paths or skip owner checks, enabling traversal or cross-user reads.
+- Root cause: missing explicit storage constraints before endpoint implementation.
+- Fix: documented storage constraints requiring server-generated `storage_key`, root-scoped disk access, and owner-scoped metadata queries.
+- Verification: architecture + design docs now define the `files` schema and constraint contract used by upcoming storage implementation commits.
+- Files touched:
+  - `docs/architecture.md`
+  - `docs/design.md`
+- Linked commit/PR: pending
+- Notes: this is a preventative design control to harden storage APIs before code lands.
+
+## 2026-03-05 - Avoided metadata integrity ambiguity for file lifecycle
+- Status: fixed
+- Severity: medium
+- Symptom: without explicit checksum/size metadata and delete semantics, storage APIs risk inconsistent validation and destructive delete behavior.
+- Root cause: file lifecycle invariants were not yet codified in project docs.
+- Fix: defined `size_bytes`, `checksum_sha256`, and `is_deleted` in the planned schema, with immutable-content baseline and soft-delete behavior.
+- Verification: storage schema section now exists in architecture and linked design decision entry.
+- Files touched:
+  - `docs/architecture.md`
+  - `docs/design.md`
+- Linked commit/PR: pending
+- Notes: reduces migration churn and supports future auditing/indexing flows.
+
 ## 2026-03-05 - Avoided auth bypass on protected routes
 - Status: fixed
 - Severity: high

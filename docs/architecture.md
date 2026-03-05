@@ -85,6 +85,11 @@ The backend is responsible for:
 - Indexing services
 - System monitoring
 
+Current storage API surface:
+
+- `POST /api/v1/files/upload`: authenticated multipart upload with metadata persistence
+- `GET /api/v1/files/{file_id}/download`: authenticated file download with owner-scoped metadata lookup
+
 FastAPI provides the primary HTTP API.
 
 PostgreSQL stores structured metadata including:
@@ -93,6 +98,11 @@ PostgreSQL stores structured metadata including:
 - Files
 - Permissions
 - Indexing information
+
+Current implemented metadata tables:
+
+- `users`: authentication identity records
+- `files`: owner-scoped file metadata (name, storage key, checksum, size, and lifecycle flags)
 
 ## Storage Layer
 
@@ -106,6 +116,33 @@ File contents are stored directly on disk while the database tracks:
 - indexing data
 
 This allows large files to be stored efficiently without database overhead.
+
+### File Metadata Schema (Implemented Baseline)
+
+The first storage metadata slice will introduce a `files` table with the following fields:
+
+- `id`: integer primary key
+- `owner_id`: foreign key to `users.id`, indexed, non-null
+- `original_name`: client-provided filename, non-null
+- `storage_key`: server-generated relative storage path key, unique, non-null
+- `mime_type`: optional MIME type from upload metadata
+- `size_bytes`: file size in bytes, non-null
+- `checksum_sha256`: content checksum, non-null
+- `is_deleted`: soft-delete flag, non-null default `false`
+- `created_at`: timestamp with timezone, server default `now()`, non-null
+- `updated_at`: timestamp with timezone, server default `now()`, non-null
+
+### Storage Constraints (Implemented Baseline + Service Contracts)
+
+Storage behavior for upload/download flows is constrained by the following rules:
+
+- Path ownership: every file metadata row is scoped to `owner_id`; API reads must enforce owner match.
+- Path safety: `storage_key` is server-generated and must never be accepted directly from user input.
+- Disk scope: all file writes/reads must stay under a configured storage root directory.
+- Integrity: `size_bytes` and `checksum_sha256` are stored at upload time and used for validation/diagnostics.
+- Immutability baseline: file content is immutable in v1; updates are represented as new file records.
+- Delete behavior: initial delete support is soft-delete (`is_deleted=true`) to preserve auditability.
+- Service boundaries: storage interfaces separate key generation from binary I/O (`StorageKeyService`, `BlobStorageService`) before concrete implementations are added.
 
 ## Synchronization Model
 
@@ -141,7 +178,6 @@ Application-level authentication protects API endpoints.
 
 Current architecture does not yet include:
 
-- Full authentication implementation
 - Background worker system
 - File versioning
 - Observability stack
