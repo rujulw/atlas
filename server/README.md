@@ -8,6 +8,7 @@ This directory contains the FastAPI backend for Atlas.
 - Module boundaries for API, core, models, schemas, services, repositories, and db
 - Alembic migrations for users and files
 - PBKDF2 password hashing + JWT access token auth baseline
+- Identity crypto settings and encrypted user-field scaffolding
 - File upload/download routes with metadata persistence
 - Dependency management and development tooling
 

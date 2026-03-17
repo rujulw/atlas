@@ -15,7 +15,19 @@ class UserRepository(Protocol):
     def get_by_email(self, email: str) -> User | None:
         """Find a user by email address."""
 
-    def create(self, email: str, hashed_password: str, full_name: str | None = None) -> User:
+    def create(
+        self,
+        email: str,
+        hashed_password: str,
+        full_name: str | None = None,
+        *,
+        email_ciphertext: str | None = None,
+        email_blind_index: str | None = None,
+        username_ciphertext: str | None = None,
+        username_blind_index: str | None = None,
+        full_name_ciphertext: str | None = None,
+        identity_key_version: str | None = None,
+    ) -> User:
         """Create and persist a new user."""
 
 
@@ -28,8 +40,30 @@ class SQLAlchemyUserRepository:
     def get_by_email(self, email: str) -> User | None:
         return self.db.execute(select(User).where(User.email == email)).scalar_one_or_none()
 
-    def create(self, email: str, hashed_password: str, full_name: str | None = None) -> User:
-        user = User(email=email, hashed_password=hashed_password, full_name=full_name)
+    def create(
+        self,
+        email: str,
+        hashed_password: str,
+        full_name: str | None = None,
+        *,
+        email_ciphertext: str | None = None,
+        email_blind_index: str | None = None,
+        username_ciphertext: str | None = None,
+        username_blind_index: str | None = None,
+        full_name_ciphertext: str | None = None,
+        identity_key_version: str | None = None,
+    ) -> User:
+        user = User(
+            email=email,
+            hashed_password=hashed_password,
+            full_name=full_name,
+            email_ciphertext=email_ciphertext,
+            email_blind_index=email_blind_index,
+            username_ciphertext=username_ciphertext,
+            username_blind_index=username_blind_index,
+            full_name_ciphertext=full_name_ciphertext,
+            identity_key_version=identity_key_version,
+        )
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
