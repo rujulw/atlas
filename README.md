@@ -104,6 +104,9 @@ DATABASE_URL=
 REDIS_URL=
 SECRET_KEY=
 ACCESS_TOKEN_EXPIRE_MINUTES=
+IDENTITY_ENCRYPTION_KEY=
+IDENTITY_BLIND_INDEX_KEY=
+IDENTITY_KEY_VERSION=
 STORAGE_ROOT_PATH=
 ```
 
@@ -121,7 +124,7 @@ Missing features include:
 
 - Owner-scoped file listing and search
 - Refresh-token sessions and device management
-- Encrypted identity fields and blind-index lookup
+- Encrypted identity fields at rest
 - Internal service trust for future subservices
 - Observability tooling
 - Tailnet-oriented production deployment hardening

@@ -7,6 +7,14 @@ from app.services.auth import (
     TokenService,
     TokenValidationError,
 )
+from app.services.identity import (
+    BlindIndexService,
+    EncryptedIdentityValue,
+    HMACSHA256BlindIndexService,
+    IdentityCipherService,
+    IdentityCryptoSettings,
+    normalize_email,
+)
 from app.services.storage import (
     BlobStorageService,
     LocalBlobStorageService,
@@ -21,6 +29,12 @@ __all__ = [
     "PBKDF2PasswordService",
     "JWTAccessTokenService",
     "TokenValidationError",
+    "IdentityCryptoSettings",
+    "EncryptedIdentityValue",
+    "IdentityCipherService",
+    "BlindIndexService",
+    "HMACSHA256BlindIndexService",
+    "normalize_email",
     "StoredFileObject",
     "StorageKeyService",
     "BlobStorageService",

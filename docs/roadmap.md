@@ -75,7 +75,7 @@ These features prepare Atlas for long-running production deployments.
 
 Near-term implementation priorities after current baseline:
 
-- Add encrypted identity fields and blind-index login lookup
+- Add encrypted identity fields and complete migration away from plaintext identity storage
 - Migrate JWT subjects from email to internal user ids
 - Introduce refresh-token sessions with revocation and device tracking
 - Define service-to-service trust for future private subservices
@@ -88,6 +88,13 @@ Auth-specific delivery constraints for this slice:
 - sensitive identity fields such as email, username, and full name move to application-layer encryption
 - login lookup shifts to blind indexes instead of plaintext identity queries
 - future internal subservices consume Atlas identity instead of introducing parallel auth systems
+
+Design outputs required before implementation expands:
+
+- document the planned user-record split between internal ids, ciphertext fields, and blind indexes
+- define canonical normalization rules for email and username lookup inputs
+- define where ciphertext verification happens relative to blind-index lookup and password verification
+- document key-separation expectations for encryption versus blind-index derivation
 
 ## Private Platform Direction
 
@@ -105,6 +112,8 @@ Incremental sequence from here:
 3. Introduce refresh-token-backed sessions with revocation and device tracking.
 4. Add internal service trust primitives for private subservices on the same server.
 5. Build the media-service integration on Atlas-issued identity rather than a separate auth layer.
+
+The first of these steps is intentionally a design and schema-modeling pass before migration code lands.
 
 ## Open-Source Delivery Model
 

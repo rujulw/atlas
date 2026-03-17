@@ -40,10 +40,10 @@ def get_blob_storage_service() -> BlobStorageService:
 
 
 def _resolve_current_user(
-    current_subject: str,
+    current_subject: int,
     user_repository: UserRepository,
 ) -> User:
-    user = user_repository.get_by_email(current_subject)
+    user = user_repository.get_by_id(current_subject)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,7 +55,7 @@ def _resolve_current_user(
 @router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = File(...),
-    current_subject: str = Depends(get_current_subject),
+    current_subject: int = Depends(get_current_subject),
     user_repository: UserRepository = Depends(get_user_repository),
     file_repository: FileRepository = Depends(get_file_repository),
     storage_key_service: StorageKeyService = Depends(get_storage_key_service),
@@ -104,7 +104,7 @@ async def upload_file(
 @router.get("/{file_id}/download")
 async def download_file(
     file_id: int,
-    current_subject: str = Depends(get_current_subject),
+    current_subject: int = Depends(get_current_subject),
     user_repository: UserRepository = Depends(get_user_repository),
     file_repository: FileRepository = Depends(get_file_repository),
     blob_storage_service: BlobStorageService = Depends(get_blob_storage_service),

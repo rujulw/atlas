@@ -15,6 +15,7 @@ from app.services.auth import (
     TokenService,
     TokenValidationError,
 )
+from app.services.identity import BlindIndexService, HMACSHA256BlindIndexService, normalize_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -31,6 +32,10 @@ def get_password_service() -> PasswordService:
     return PBKDF2PasswordService()
 
 
+def get_blind_index_service() -> BlindIndexService:
+    return HMACSHA256BlindIndexService(key=settings.IDENTITY_BLIND_INDEX_KEY)
+
+
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
     return SQLAlchemyUserRepository(db=db)
 
@@ -38,7 +43,7 @@ def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
 def get_current_subject(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     token_service: TokenService = Depends(get_token_service),
-) -> str:
+) -> int:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -47,11 +52,20 @@ def get_current_subject(
         )
 
     try:
-        return token_service.verify_access_token(credentials.credentials)
+        subject = token_service.verify_access_token(credentials.credentials)
     except TokenValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    try:
+        return int(subject)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token subject.",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
@@ -62,8 +76,14 @@ async def login(
     token_service: TokenService = Depends(get_token_service),
     user_repository: UserRepository = Depends(get_user_repository),
     password_service: PasswordService = Depends(get_password_service),
+    blind_index_service: BlindIndexService = Depends(get_blind_index_service),
 ) -> TokenResponse:
-    user = user_repository.get_by_email(payload.email)
+    normalized_email = normalize_email(payload.email)
+    email_blind_index = blind_index_service.derive(normalized_email)
+    user = user_repository.get_by_email_blind_index(email_blind_index)
+    if user is None:
+        user = user_repository.get_by_email(normalized_email)
+
     if user is None or not password_service.verify_password(
         payload.password,
         user.hashed_password,
@@ -74,7 +94,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = token_service.issue_access_token(subject=payload.email)
+    access_token = token_service.issue_access_token(subject=str(user.id))
     return TokenResponse(access_token=access_token)
 
 
@@ -83,8 +103,14 @@ async def register(
     payload: RegisterRequest,
     user_repository: UserRepository = Depends(get_user_repository),
     password_service: PasswordService = Depends(get_password_service),
+    blind_index_service: BlindIndexService = Depends(get_blind_index_service),
 ) -> dict[str, str]:
-    existing_user = user_repository.get_by_email(payload.email)
+    normalized_email = normalize_email(payload.email)
+    email_blind_index = blind_index_service.derive(normalized_email)
+
+    existing_user = user_repository.get_by_email_blind_index(email_blind_index)
+    if existing_user is None:
+        existing_user = user_repository.get_by_email(normalized_email)
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -93,9 +119,11 @@ async def register(
 
     hashed_password = password_service.hash_password(payload.password)
     user_repository.create(
-        email=payload.email,
+        email=normalized_email,
         hashed_password=hashed_password,
         full_name=payload.full_name,
+        email_blind_index=email_blind_index,
+        identity_key_version=settings.IDENTITY_KEY_VERSION,
     )
 
     return {"detail": "User registered successfully."}
@@ -103,6 +131,13 @@ async def register(
 
 @router.get("/me")
 async def read_current_user_email(
-    current_subject: str = Depends(get_current_subject),
+    current_subject: int = Depends(get_current_subject),
+    user_repository: UserRepository = Depends(get_user_repository),
 ) -> dict[str, str]:
-    return {"email": current_subject}
+    user = user_repository.get_by_id(current_subject)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user not found.",
+        )
+    return {"email": user.email}

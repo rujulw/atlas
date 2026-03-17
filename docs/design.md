@@ -206,3 +206,29 @@
   - Add refresh-session persistence, rotation, and revocation behavior
   - Define internal service credential shape for private subservices
 - References: `docs/architecture.md`, `docs/roadmap.md`
+
+## 11. Encrypted identity and blind-index auth model
+- Status: accepted
+- Area: backend
+- Decision: model user identity with a stable internal id, application-encrypted identity ciphertext fields, and separate blind-index columns for deterministic login lookup.
+- Context: Atlas currently stores email and full name in plaintext and uses email as the JWT subject. That is workable for the baseline but does not meet the intended privacy posture for a tailnet-only identity provider that may back future subservices.
+- Options considered:
+  - Option A: keep plaintext email uniqueness and use encrypted fields only for non-login profile data
+  - Option B: encrypt sensitive identity fields and introduce blind indexes for login and uniqueness checks
+  - Option C: hash login identifiers directly and drop recoverable plaintext identity storage entirely
+- Tradeoffs:
+  - Pros:
+    - Keeps raw identity values out of the database while preserving deterministic login lookup
+    - Separates mutable user-facing identifiers from stable authorization identity
+    - Gives future implementation commits a clear schema shape for encrypted fields and login indexes
+  - Cons:
+    - Requires careful normalization rules to avoid duplicate-account or missed-login edge cases
+    - Adds operational key-management complexity compared with plaintext fields
+    - Still leaks equality patterns through blind indexes, so this improves privacy but is not full zero-leak storage
+- Outcome: the planned auth model now assumes internal user ids for principal identity, encrypted ciphertext columns for sensitive identity fields, and blind-index columns derived from normalized email/username values for lookup.
+- Follow-up actions:
+  - Define concrete normalization helpers for email and username
+  - Add configuration for encryption keys and blind-index derivation keys
+  - Introduce schema/migration changes for ciphertext and blind-index columns
+  - Preserve one-way password hashing unchanged through the migration
+- References: `docs/architecture.md`, `docs/roadmap.md`

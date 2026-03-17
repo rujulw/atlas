@@ -103,7 +103,7 @@ Current auth API surface:
 
 - `POST /api/v1/auth/register`: create a user with hashed password persistence
 - `POST /api/v1/auth/login`: verify credentials and issue a signed JWT access token
-- `GET /api/v1/auth/me`: validate bearer token and return current token subject
+- `GET /api/v1/auth/me`: validate bearer token, resolve the internal user id, and return current user identity
 
 FastAPI provides the primary HTTP API.
 
@@ -123,10 +123,31 @@ Current user identity baseline:
 
 - `users.id`: internal integer identifier
 - `users.email`: unique login identifier in plaintext today
+- `users.email_blind_index`: deterministic email lookup value derived in application code
 - `users.hashed_password`: one-way PBKDF2 password hash
 - `users.full_name`: optional profile field in plaintext today
 
 The next auth direction is to keep `hashed_password` as a one-way hash while moving sensitive identity fields such as email, username, and full name behind application-layer encryption and blind-index lookup support.
+
+### Planned Identity Model
+
+The next auth iteration should reshape identity storage around three kinds of user data:
+
+- stable internal identifiers used for authorization and token subjects
+- encrypted user-facing identity fields stored as ciphertext at rest
+- blind indexes derived from normalized identity values for deterministic lookup
+
+The intended user record shape is:
+
+- `users.id`: internal primary key and future JWT subject source
+- `users.hashed_password`: one-way password hash
+- `users.email_ciphertext`: encrypted canonical email value
+- `users.email_bidx`: blind index for canonical email equality lookup
+- `users.username_ciphertext`: encrypted username value when usernames are enabled
+- `users.username_bidx`: blind index for username equality lookup when usernames are enabled
+- `users.full_name_ciphertext`: encrypted profile display name
+
+The exact column names may change during implementation, but the separation of internal id, ciphertext fields, and blind indexes is the key design decision.
 
 ## Storage Layer
 
@@ -201,9 +222,9 @@ Application-level authentication protects API endpoints.
 Current implementation details:
 
 - passwords are hashed with PBKDF2 and never encrypted for reversible recovery
-- login currently looks users up by plaintext email
+- login normalizes email input and resolves users through blind-index lookup with plaintext-email fallback for compatibility
 - JWT access token validation is centralized through a shared dependency
-- JWT subject currently uses email and should migrate to an internal user id
+- JWT subject now uses the internal user id instead of email
 
 Next-direction constraints:
 
@@ -222,6 +243,24 @@ The intended privacy model for user identity is:
 - keep encryption keys outside the database in server configuration suitable for self-hosted deployment
 
 This is meant to reduce the exposure of user identity data if the database is compromised while preserving practical login behavior.
+
+The intended login lookup flow is:
+
+1. Normalize the submitted identifier in application code.
+2. Derive a blind index from the normalized value.
+3. Query by blind index rather than raw email or username.
+4. Decrypt the matching ciphertext field only after a candidate row is found.
+5. Verify the canonical plaintext value before password verification succeeds.
+
+This avoids using ciphertext directly for equality queries while still preventing the database from storing raw identity values.
+
+The intended cryptographic boundaries are:
+
+- passwords are always one-way hashed and are never encrypted
+- blind indexes are used only for equality lookup, not value recovery
+- ciphertext fields are decrypted only inside the application layer
+- encryption and blind-index keys stay outside PostgreSQL
+- normalization must happen before encryption and blind-index derivation so uniqueness behavior stays deterministic
 
 ### Session Direction
 
