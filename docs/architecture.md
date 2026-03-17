@@ -128,6 +128,26 @@ Current user identity baseline:
 
 The next auth direction is to keep `hashed_password` as a one-way hash while moving sensitive identity fields such as email, username, and full name behind application-layer encryption and blind-index lookup support.
 
+### Planned Identity Model
+
+The next auth iteration should reshape identity storage around three kinds of user data:
+
+- stable internal identifiers used for authorization and token subjects
+- encrypted user-facing identity fields stored as ciphertext at rest
+- blind indexes derived from normalized identity values for deterministic lookup
+
+The intended user record shape is:
+
+- `users.id`: internal primary key and future JWT subject source
+- `users.hashed_password`: one-way password hash
+- `users.email_ciphertext`: encrypted canonical email value
+- `users.email_bidx`: blind index for canonical email equality lookup
+- `users.username_ciphertext`: encrypted username value when usernames are enabled
+- `users.username_bidx`: blind index for username equality lookup when usernames are enabled
+- `users.full_name_ciphertext`: encrypted profile display name
+
+The exact column names may change during implementation, but the separation of internal id, ciphertext fields, and blind indexes is the key design decision.
+
 ## Storage Layer
 
 Atlas separates **file data** from **metadata**.
@@ -222,6 +242,24 @@ The intended privacy model for user identity is:
 - keep encryption keys outside the database in server configuration suitable for self-hosted deployment
 
 This is meant to reduce the exposure of user identity data if the database is compromised while preserving practical login behavior.
+
+The intended login lookup flow is:
+
+1. Normalize the submitted identifier in application code.
+2. Derive a blind index from the normalized value.
+3. Query by blind index rather than raw email or username.
+4. Decrypt the matching ciphertext field only after a candidate row is found.
+5. Verify the canonical plaintext value before password verification succeeds.
+
+This avoids using ciphertext directly for equality queries while still preventing the database from storing raw identity values.
+
+The intended cryptographic boundaries are:
+
+- passwords are always one-way hashed and are never encrypted
+- blind indexes are used only for equality lookup, not value recovery
+- ciphertext fields are decrypted only inside the application layer
+- encryption and blind-index keys stay outside PostgreSQL
+- normalization must happen before encryption and blind-index derivation so uniqueness behavior stays deterministic
 
 ### Session Direction
 
