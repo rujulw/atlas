@@ -15,6 +15,9 @@ class UserRepository(Protocol):
     def get_by_email(self, email: str) -> User | None:
         """Find a user by email address."""
 
+    def get_by_email_blind_index(self, email_blind_index: str) -> User | None:
+        """Find a user by blind-indexed email."""
+
     def create(
         self,
         email: str,
@@ -39,6 +42,11 @@ class SQLAlchemyUserRepository:
 
     def get_by_email(self, email: str) -> User | None:
         return self.db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+
+    def get_by_email_blind_index(self, email_blind_index: str) -> User | None:
+        return self.db.execute(
+            select(User).where(User.email_blind_index == email_blind_index)
+        ).scalar_one_or_none()
 
     def create(
         self,

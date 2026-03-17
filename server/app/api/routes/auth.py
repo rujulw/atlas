@@ -15,6 +15,7 @@ from app.services.auth import (
     TokenService,
     TokenValidationError,
 )
+from app.services.identity import BlindIndexService, HMACSHA256BlindIndexService, normalize_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -29,6 +30,10 @@ def get_token_service() -> TokenService:
 
 def get_password_service() -> PasswordService:
     return PBKDF2PasswordService()
+
+
+def get_blind_index_service() -> BlindIndexService:
+    return HMACSHA256BlindIndexService(key=settings.IDENTITY_BLIND_INDEX_KEY)
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
@@ -62,8 +67,14 @@ async def login(
     token_service: TokenService = Depends(get_token_service),
     user_repository: UserRepository = Depends(get_user_repository),
     password_service: PasswordService = Depends(get_password_service),
+    blind_index_service: BlindIndexService = Depends(get_blind_index_service),
 ) -> TokenResponse:
-    user = user_repository.get_by_email(payload.email)
+    normalized_email = normalize_email(payload.email)
+    email_blind_index = blind_index_service.derive(normalized_email)
+    user = user_repository.get_by_email_blind_index(email_blind_index)
+    if user is None:
+        user = user_repository.get_by_email(normalized_email)
+
     if user is None or not password_service.verify_password(
         payload.password,
         user.hashed_password,
@@ -83,8 +94,14 @@ async def register(
     payload: RegisterRequest,
     user_repository: UserRepository = Depends(get_user_repository),
     password_service: PasswordService = Depends(get_password_service),
+    blind_index_service: BlindIndexService = Depends(get_blind_index_service),
 ) -> dict[str, str]:
-    existing_user = user_repository.get_by_email(payload.email)
+    normalized_email = normalize_email(payload.email)
+    email_blind_index = blind_index_service.derive(normalized_email)
+
+    existing_user = user_repository.get_by_email_blind_index(email_blind_index)
+    if existing_user is None:
+        existing_user = user_repository.get_by_email(normalized_email)
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -93,9 +110,11 @@ async def register(
 
     hashed_password = password_service.hash_password(payload.password)
     user_repository.create(
-        email=payload.email,
+        email=normalized_email,
         hashed_password=hashed_password,
         full_name=payload.full_name,
+        email_blind_index=email_blind_index,
+        identity_key_version=settings.IDENTITY_KEY_VERSION,
     )
 
     return {"detail": "User registered successfully."}

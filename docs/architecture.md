@@ -123,6 +123,7 @@ Current user identity baseline:
 
 - `users.id`: internal integer identifier
 - `users.email`: unique login identifier in plaintext today
+- `users.email_blind_index`: deterministic email lookup value derived in application code
 - `users.hashed_password`: one-way PBKDF2 password hash
 - `users.full_name`: optional profile field in plaintext today
 
@@ -221,7 +222,7 @@ Application-level authentication protects API endpoints.
 Current implementation details:
 
 - passwords are hashed with PBKDF2 and never encrypted for reversible recovery
-- login currently looks users up by plaintext email
+- login normalizes email input and resolves users through blind-index lookup with plaintext-email fallback for compatibility
 - JWT access token validation is centralized through a shared dependency
 - JWT subject currently uses email and should migrate to an internal user id
 

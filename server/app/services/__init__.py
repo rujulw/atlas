@@ -10,8 +10,10 @@ from app.services.auth import (
 from app.services.identity import (
     BlindIndexService,
     EncryptedIdentityValue,
+    HMACSHA256BlindIndexService,
     IdentityCipherService,
     IdentityCryptoSettings,
+    normalize_email,
 )
 from app.services.storage import (
     BlobStorageService,
@@ -31,6 +33,8 @@ __all__ = [
     "EncryptedIdentityValue",
     "IdentityCipherService",
     "BlindIndexService",
+    "HMACSHA256BlindIndexService",
+    "normalize_email",
     "StoredFileObject",
     "StorageKeyService",
     "BlobStorageService",

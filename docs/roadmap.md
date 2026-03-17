@@ -75,7 +75,7 @@ These features prepare Atlas for long-running production deployments.
 
 Near-term implementation priorities after current baseline:
 
-- Add encrypted identity fields and blind-index login lookup
+- Add encrypted identity fields and complete migration away from plaintext identity storage
 - Migrate JWT subjects from email to internal user ids
 - Introduce refresh-token sessions with revocation and device tracking
 - Define service-to-service trust for future private subservices
