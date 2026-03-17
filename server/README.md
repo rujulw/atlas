@@ -1,12 +1,14 @@
 # Atlas Backend
 
-This directory contains the FastAPI backend scaffold.
+This directory contains the FastAPI backend for Atlas.
 
 ## Current scope
 
 - App entrypoint (`app/main.py`)
-- Module boundaries for API, core, models, schemas, services, and db
-- Placeholder migration and test structure
+- Module boundaries for API, core, models, schemas, services, repositories, and db
+- Alembic migrations for users and files
+- PBKDF2 password hashing + JWT access token auth baseline
+- File upload/download routes with metadata persistence
 - Dependency management and development tooling
 
 ## Local development

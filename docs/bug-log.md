@@ -183,7 +183,7 @@
 - Symptom: early endpoints could have shipped as unversioned paths and become hard to evolve safely.
 - Root cause: no versioning boundary at initial API exposure.
 - Fix: all initial routes mounted under `/api/v1/*`.
-- Verification: health and auth stubs resolve through versioned prefix.
+- Verification: health and auth routes resolve through versioned prefix.
 - Files touched:
   - `server/app/api/router.py`
   - `server/app/api/v1/router.py`

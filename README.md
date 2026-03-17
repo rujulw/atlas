@@ -37,7 +37,7 @@ This repository is the public core. Instance-specific websites and deployment cu
 - React
 - Vite
 - TypeScript
-- Tailwind CSS
+- CSS
 
 ## Project Structure
 
@@ -103,7 +103,8 @@ make docker-logs
 DATABASE_URL=
 REDIS_URL=
 SECRET_KEY=
-STORAGE_PATH=
+ACCESS_TOKEN_EXPIRE_MINUTES=
+STORAGE_ROOT_PATH=
 ```
 
 ### Client (`client/.env`)
@@ -114,15 +115,16 @@ VITE_API_URL=http://localhost:8000
 
 ## Current Gaps
 
-Current version focuses on establishing core backend infrastructure.
+Current version focuses on establishing the private-cloud backend baseline.
 
 Missing features include:
 
-- Full authentication system
-- File upload pipeline
-- Indexing services
+- Owner-scoped file listing and search
+- Refresh-token sessions and device management
+- Encrypted identity fields and blind-index lookup
+- Internal service trust for future subservices
 - Observability tooling
-- Production deployment configuration
+- Tailnet-oriented production deployment hardening
 
 These will be introduced incrementally.
 

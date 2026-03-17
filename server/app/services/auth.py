@@ -170,22 +170,3 @@ class PBKDF2PasswordService:
             iterations,
         )
         return hmac.compare_digest(candidate_digest, expected_digest)
-
-
-@dataclass
-class StubTokenService:
-    """Temporary token service used until real JWT signing is implemented."""
-
-    prefix: str = "stub-token-for"
-
-    def issue_access_token(self, subject: str) -> str:
-        sanitized_subject = subject.replace("@", "_at_")
-        return f"{self.prefix}-{sanitized_subject}"
-
-    def verify_access_token(self, token: str) -> str:
-        token_prefix = f"{self.prefix}-"
-        if not token.startswith(token_prefix):
-            raise TokenValidationError("Invalid access token signature.")
-
-        sanitized_subject = token.removeprefix(token_prefix)
-        return sanitized_subject.replace("_at_", "@")

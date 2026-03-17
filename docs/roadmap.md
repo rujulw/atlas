@@ -22,16 +22,17 @@ Current baseline progress (completed):
 
 - API versioned routing and health endpoint
 - PostgreSQL + Alembic migration baseline
-- Auth domain stubs and login/register API placeholders
+- User registration, password hashing, JWT login, and auth guard baseline
 - React + Vite + TypeScript client bootstrap
-- Client integration to backend health/auth stubs
+- Client integration to backend health/auth endpoints
 - Dockerized local development stack with diagnostics
+- Owner-scoped upload/download storage pipeline with metadata persistence
 
 ## 1. Core Backend
 
 Implement core infrastructure:
 
-- Authentication system
+- Encrypted identity-aware authentication system
 - File upload and download APIs
 - Metadata database models
 - API routing structure
@@ -74,10 +75,36 @@ These features prepare Atlas for long-running production deployments.
 
 Near-term implementation priorities after current baseline:
 
-- Replace auth stubs with real credential verification + token signing
-- Add persistent user creation flow and auth guard middleware
-- Introduce structured server logging for request tracing
+- Add encrypted identity fields and blind-index login lookup
+- Migrate JWT subjects from email to internal user ids
+- Introduce refresh-token sessions with revocation and device tracking
+- Define service-to-service trust for future private subservices
+- Add structured server logging for request tracing
 - Add CI checks for backend tests and frontend type/build validation
+
+Auth-specific delivery constraints for this slice:
+
+- passwords stay hashed and are never switched to reversible encryption
+- sensitive identity fields such as email, username, and full name move to application-layer encryption
+- login lookup shifts to blind indexes instead of plaintext identity queries
+- future internal subservices consume Atlas identity instead of introducing parallel auth systems
+
+## Private Platform Direction
+
+Atlas is now explicitly tracking a tailnet-only personal-cloud direction:
+
+- private-network reachability over public exposure
+- Atlas as the canonical identity layer for future internal services
+- media-service integration built on Atlas-issued identity
+- database compromise resilience through encrypted identity storage and blind indexes
+
+Incremental sequence from here:
+
+1. Add encrypted identity persistence and blind-index lookup without breaking the current auth flow.
+2. Migrate access-token subjects and auth guards to internal user ids.
+3. Introduce refresh-token-backed sessions with revocation and device tracking.
+4. Add internal service trust primitives for private subservices on the same server.
+5. Build the media-service integration on Atlas-issued identity rather than a separate auth layer.
 
 ## Open-Source Delivery Model
 

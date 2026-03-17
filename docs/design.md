@@ -99,7 +99,7 @@
   - Add SQLAlchemy `File` model and Alembic migration
   - Introduce storage service interfaces for key generation, write/read, and metadata persistence
   - Add API tests for upload/download ownership and invalid-path access
-- References: `docs/architecture.md`, `server/app/models/user.py`, `commits.txt`
+- References: `docs/architecture.md`, `docs/roadmap.md`, `server/app/models/user.py`
 
 ## 6. File model + migration + storage interface boundary
 - Status: accepted
@@ -182,3 +182,27 @@
   - Extend storage tests with malformed multipart payload and large-file streaming scenarios
   - Add CI gate for storage integration suite in pull request checks
 - References: `server/tests/api/v1/test_files_integration.py`, `server/app/api/routes/files.py`
+
+## 10. Privacy-first auth direction for internal private services
+- Status: accepted
+- Area: backend
+- Decision: evolve Atlas auth into a tailnet-only identity layer using encrypted identity fields, blind indexes, internal user-id token subjects, refresh-token sessions, and explicit service-to-service trust boundaries.
+- Context: Atlas is intended to be a private personal-cloud platform rather than a public internet application, and future internal services on the same server should trust Atlas identity instead of reimplementing auth.
+- Options considered:
+  - Option A: keep plaintext identity fields and email-based JWT subjects for simplicity
+  - Option B: move toward encrypted identity storage, blind-index lookup, user-id subjects, and revocable session-backed auth
+- Tradeoffs:
+  - Pros:
+    - Reduces user identity exposure if the database is compromised
+    - Gives future private subservices a stable trust anchor independent of mutable email addresses
+    - Supports device-aware revocation and a more production-sane session lifecycle
+  - Cons:
+    - Adds schema, migration, and operational complexity around key management and token/session handling
+    - Requires careful incremental rollout to avoid breaking current auth and test coverage
+- Outcome: follow-on implementation planning now targets encrypted identity storage, blind-index login lookup, internal-user-id JWT subjects, refresh-token sessions, revocation/device tracking, and service trust for future media/private subservices.
+- Follow-up actions:
+  - Add encrypted identity persistence and blind-index lookup primitives
+  - Migrate auth guard resolution from email subjects to internal user ids
+  - Add refresh-session persistence, rotation, and revocation behavior
+  - Define internal service credential shape for private subservices
+- References: `docs/architecture.md`, `docs/roadmap.md`

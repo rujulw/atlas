@@ -1,4 +1,4 @@
-"""Authentication route stubs."""
+"""Authentication routes."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
