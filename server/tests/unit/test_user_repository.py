@@ -52,3 +52,21 @@ def test_user_repository_persists_identity_scaffolding_fields() -> None:
     assert created_user.username_blind_index == "bidx:username"
     assert created_user.full_name_ciphertext == "enc:full-name"
     assert created_user.identity_key_version == "v1"
+
+
+def test_user_repository_fetches_user_by_email_blind_index() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(bind=engine, tables=[User.__table__])
+
+    with Session(engine) as session:
+        user_repository = SQLAlchemyUserRepository(db=session)
+        user_repository.create(
+            email="user@example.com",
+            hashed_password="password-hash",
+            email_blind_index="bidx:email",
+        )
+
+        fetched_user = user_repository.get_by_email_blind_index("bidx:email")
+
+    assert fetched_user is not None
+    assert fetched_user.email == "user@example.com"

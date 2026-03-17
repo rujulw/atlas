@@ -16,27 +16,44 @@ class FakeUser:
     email: str
     hashed_password: str
     full_name: str | None = None
+    email_blind_index: str | None = None
+    identity_key_version: str | None = None
 
 
 class FakeUserRepository:
     def __init__(self) -> None:
         self.users_by_email: dict[str, FakeUser] = {}
+        self.users_by_email_blind_index: dict[str, FakeUser] = {}
 
     def get_by_email(self, email: str) -> FakeUser | None:
         return self.users_by_email.get(email)
+
+    def get_by_email_blind_index(self, email_blind_index: str) -> FakeUser | None:
+        return self.users_by_email_blind_index.get(email_blind_index)
 
     def create(
         self,
         email: str,
         hashed_password: str,
         full_name: str | None = None,
+        *,
+        email_ciphertext: str | None = None,
+        email_blind_index: str | None = None,
+        username_ciphertext: str | None = None,
+        username_blind_index: str | None = None,
+        full_name_ciphertext: str | None = None,
+        identity_key_version: str | None = None,
     ) -> FakeUser:
         user = FakeUser(
             email=email,
             hashed_password=hashed_password,
             full_name=full_name,
+            email_blind_index=email_blind_index,
+            identity_key_version=identity_key_version,
         )
         self.users_by_email[email] = user
+        if email_blind_index is not None:
+            self.users_by_email_blind_index[email_blind_index] = user
         return user
 
 
@@ -169,3 +186,26 @@ def test_register_rejects_duplicate_email() -> None:
 
     assert response.status_code == 409
     assert response.json()["detail"] == "User already exists."
+
+
+def test_register_persists_email_blind_index_for_lookup() -> None:
+    fake_user_repository = FakeUserRepository()
+    app.dependency_overrides[get_user_repository] = lambda: fake_user_repository
+
+    try:
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "User@Example.com",
+                "password": "password123",
+                "full_name": "Atlas User",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    persisted_user = fake_user_repository.get_by_email("user@example.com")
+    assert persisted_user is not None
+    assert persisted_user.email_blind_index is not None
+    assert persisted_user.identity_key_version == "v1"

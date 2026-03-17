@@ -108,3 +108,38 @@ def test_protected_route_fails_with_invalid_token(client: TestClient) -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid access token format."
+
+
+def test_register_persists_email_blind_index_for_login_lookup(client: TestClient) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "User@Example.com",
+            "password": "password123",
+            "full_name": "Atlas User",
+        },
+    )
+    assert register_response.status_code == 201
+
+    with next(client.app.dependency_overrides[get_db]()) as db:
+        stored_user = db.query(User).filter(User.email == "user@example.com").one()
+        blind_index = stored_user.email_blind_index
+        db.delete(stored_user)
+        db.commit()
+
+        replacement_user = User(
+            email="user@example.com",
+            email_blind_index=blind_index,
+            hashed_password=stored_user.hashed_password,
+            full_name=stored_user.full_name,
+            identity_key_version=stored_user.identity_key_version,
+        )
+        db.add(replacement_user)
+        db.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": " user@example.com ", "password": "password123"},
+    )
+
+    assert login_response.status_code == 200
