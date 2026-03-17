@@ -43,7 +43,7 @@ def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
 def get_current_subject(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     token_service: TokenService = Depends(get_token_service),
-) -> str:
+) -> int:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,11 +52,20 @@ def get_current_subject(
         )
 
     try:
-        return token_service.verify_access_token(credentials.credentials)
+        subject = token_service.verify_access_token(credentials.credentials)
     except TokenValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    try:
+        return int(subject)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token subject.",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
@@ -85,7 +94,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = token_service.issue_access_token(subject=payload.email)
+    access_token = token_service.issue_access_token(subject=str(user.id))
     return TokenResponse(access_token=access_token)
 
 
@@ -122,6 +131,13 @@ async def register(
 
 @router.get("/me")
 async def read_current_user_email(
-    current_subject: str = Depends(get_current_subject),
+    current_subject: int = Depends(get_current_subject),
+    user_repository: UserRepository = Depends(get_user_repository),
 ) -> dict[str, str]:
-    return {"email": current_subject}
+    user = user_repository.get_by_id(current_subject)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user not found.",
+        )
+    return {"email": user.email}

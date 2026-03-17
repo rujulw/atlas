@@ -103,7 +103,7 @@ Current auth API surface:
 
 - `POST /api/v1/auth/register`: create a user with hashed password persistence
 - `POST /api/v1/auth/login`: verify credentials and issue a signed JWT access token
-- `GET /api/v1/auth/me`: validate bearer token and return current token subject
+- `GET /api/v1/auth/me`: validate bearer token, resolve the internal user id, and return current user identity
 
 FastAPI provides the primary HTTP API.
 
@@ -224,7 +224,7 @@ Current implementation details:
 - passwords are hashed with PBKDF2 and never encrypted for reversible recovery
 - login normalizes email input and resolves users through blind-index lookup with plaintext-email fallback for compatibility
 - JWT access token validation is centralized through a shared dependency
-- JWT subject currently uses email and should migrate to an internal user id
+- JWT subject now uses the internal user id instead of email
 
 Next-direction constraints:
 

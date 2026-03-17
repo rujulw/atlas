@@ -143,3 +143,31 @@ def test_register_persists_email_blind_index_for_login_lookup(client: TestClient
     )
 
     assert login_response.status_code == 200
+
+
+def test_me_returns_email_after_internal_user_id_subject_login(client: TestClient) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "user@example.com",
+            "password": "password123",
+            "full_name": "Atlas User",
+        },
+    )
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "user@example.com", "password": "password123"},
+    )
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    me_response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert me_response.status_code == 200
+    assert me_response.json() == {"email": "user@example.com"}

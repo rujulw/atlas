@@ -12,6 +12,9 @@ from app.models.user import User
 
 
 class UserRepository(Protocol):
+    def get_by_id(self, user_id: int) -> User | None:
+        """Find a user by internal id."""
+
     def get_by_email(self, email: str) -> User | None:
         """Find a user by email address."""
 
@@ -39,6 +42,9 @@ class SQLAlchemyUserRepository:
     """User repository backed by a SQLAlchemy session."""
 
     db: Session
+
+    def get_by_id(self, user_id: int) -> User | None:
+        return self.db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
 
     def get_by_email(self, email: str) -> User | None:
         return self.db.execute(select(User).where(User.email == email)).scalar_one_or_none()

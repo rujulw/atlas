@@ -27,13 +27,13 @@ def test_issue_access_token_produces_signed_jwt() -> None:
         now_provider=lambda: issued_at,
     )
 
-    token = token_service.issue_access_token(subject="user@example.com")
+    token = token_service.issue_access_token(subject="1")
     encoded_header, encoded_payload, encoded_signature = token.split(".")
     header = _decode_base64url(encoded_header)
     payload = _decode_base64url(encoded_payload)
 
     assert header == {"alg": "HS256", "typ": "JWT"}
-    assert payload["sub"] == "user@example.com"
+    assert payload["sub"] == "1"
     assert payload["iat"] == int(issued_at.timestamp())
     assert payload["exp"] == int(issued_at.timestamp()) + (30 * 60)
 
@@ -53,11 +53,11 @@ def test_verify_access_token_returns_subject() -> None:
         expires_minutes=30,
         now_provider=lambda: issued_at,
     )
-    token = token_service.issue_access_token(subject="user@example.com")
+    token = token_service.issue_access_token(subject="1")
 
     verified_subject = token_service.verify_access_token(token)
 
-    assert verified_subject == "user@example.com"
+    assert verified_subject == "1"
 
 
 def test_verify_access_token_rejects_expired_token() -> None:
@@ -67,7 +67,7 @@ def test_verify_access_token_rejects_expired_token() -> None:
         expires_minutes=30,
         now_provider=lambda: issued_at,
     )
-    token = token_service.issue_access_token(subject="user@example.com")
+    token = token_service.issue_access_token(subject="1")
 
     validator = JWTAccessTokenService(
         secret_key="test-secret",
