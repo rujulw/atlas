@@ -104,6 +104,7 @@ DATABASE_URL=
 REDIS_URL=
 SECRET_KEY=
 ACCESS_TOKEN_EXPIRE_MINUTES=
+REFRESH_TOKEN_EXPIRE_DAYS=
 IDENTITY_ENCRYPTION_KEY=
 IDENTITY_BLIND_INDEX_KEY=
 IDENTITY_KEY_VERSION=
@@ -130,6 +131,25 @@ Missing features include:
 - Tailnet-oriented production deployment hardening
 
 These will be introduced incrementally.
+
+## Auth API Baseline
+
+Current auth/session endpoints:
+
+- `POST /api/v1/auth/register`: create a user with hashed password persistence
+- `POST /api/v1/auth/login`: verify credentials and issue an access-token plus refresh-token pair
+- `POST /api/v1/auth/refresh`: rotate a valid refresh token and mint a new access-token plus refresh-token pair
+- `GET /api/v1/auth/me`: validate bearer token and return the current user identity
+- `GET /api/v1/auth/sessions`: list the current user's known refresh sessions and device metadata
+- `DELETE /api/v1/auth/sessions/{session_identifier}`: revoke a single refresh session
+- `DELETE /api/v1/auth/sessions`: revoke all refresh sessions for the current user
+
+Current token/session behavior:
+
+- access tokens are short-lived signed JWTs with the internal user id as `sub`
+- login and refresh responses return both `access_token` and `refresh_token`
+- refresh tokens are opaque rotating bearer secrets backed by persisted server-side sessions
+- Atlas stores only a hash of the refresh token secret, not the raw refresh token
 
 ## Development Workflow
 

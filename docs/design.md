@@ -273,8 +273,6 @@
   - Atlas should expose enough metadata for a user-facing session list without attempting strong browser fingerprinting.
   - The model assumes multiple concurrent sessions per user across different browsers or devices.
 - Follow-up actions:
-  - Add a refresh-session table and repository interface for hashed refresh secrets and lifecycle metadata
-  - Expand auth responses and routes to issue access/refresh pairs plus refresh and revoke flows
-  - Add session-listing primitives that return device metadata and revocation state
-  - Add tests proving rotated or revoked sessions cannot mint fresh access tokens
+  - Add user-facing docs for refresh/session endpoints and environment configuration
+  - Consider adding explicit cleanup/retention handling for expired revoked sessions
 - References: `docs/architecture.md`, `docs/roadmap.md`, `README.md`
