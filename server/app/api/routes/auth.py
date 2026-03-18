@@ -157,10 +157,16 @@ def _raise_refresh_token_unauthorized(detail: str = "Invalid refresh token.") ->
     )
 
 
+def _as_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _serialize_refresh_session(refresh_session: RefreshSession) -> RefreshSessionResponse:
     is_active = (
         refresh_session.revoked_at is None
-        and datetime.now(tz=UTC) < refresh_session.expires_at
+        and datetime.now(tz=UTC) < _as_utc_datetime(refresh_session.expires_at)
     )
     return RefreshSessionResponse(
         session_identifier=refresh_session.session_identifier,
@@ -248,7 +254,7 @@ async def refresh_access_token(
             refresh_session_repository.revoke_all_for_user(refresh_session.user_id)
         _raise_refresh_token_unauthorized()
 
-    if now >= refresh_session.expires_at:
+    if now >= _as_utc_datetime(refresh_session.expires_at):
         refresh_session_repository.revoke(refresh_session.session_identifier)
         _raise_refresh_token_unauthorized("Refresh token has expired.")
 
