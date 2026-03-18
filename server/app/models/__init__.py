@@ -1,6 +1,7 @@
 """Database model package."""
 
 from app.models.file import File
+from app.models.session import RefreshSession
 from app.models.user import User
 
-__all__ = ["User", "File"]
+__all__ = ["User", "File", "RefreshSession"]

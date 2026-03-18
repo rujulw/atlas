@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import binascii
 import base64
-import json
+import binascii
 import hashlib
 import hmac
+import json
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Callable, Protocol
+from typing import Protocol
 
 
 class TokenService(Protocol):
@@ -23,6 +24,10 @@ class TokenService(Protocol):
 
 class TokenValidationError(ValueError):
     """Raised when access token validation fails."""
+
+
+class RefreshTokenValidationError(ValueError):
+    """Raised when refresh token format or contents are invalid."""
 
 
 def _utc_now() -> datetime:
@@ -111,6 +116,60 @@ class JWTAccessTokenService:
             raise TokenValidationError("Access token has expired.")
 
         return subject
+
+
+@dataclass(frozen=True)
+class IssuedRefreshToken:
+    """Issued opaque refresh token plus persistence metadata."""
+
+    token: str
+    session_identifier: str
+    token_hash: str
+    expires_at: datetime
+
+
+class RefreshTokenService(Protocol):
+    def issue_refresh_token(self) -> IssuedRefreshToken:
+        """Create a new opaque refresh token plus storage metadata."""
+
+    def parse_session_identifier(self, token: str) -> str:
+        """Extract the public session identifier from a refresh token."""
+
+    def hash_refresh_token(self, token: str) -> str:
+        """Derive the persistent hash representation of a refresh token."""
+
+
+@dataclass(frozen=True)
+class OpaqueRefreshTokenService:
+    """Issue opaque refresh tokens as session-id and random-secret pairs."""
+
+    expires_days: int
+    session_identifier_bytes: int = 16
+    secret_bytes: int = 32
+    now_provider: Callable[[], datetime] = field(default=_utc_now)
+
+    def issue_refresh_token(self) -> IssuedRefreshToken:
+        session_identifier = secrets.token_hex(self.session_identifier_bytes)
+        secret = secrets.token_urlsafe(self.secret_bytes)
+        token = f"{session_identifier}.{secret}"
+        expires_at = self.now_provider() + timedelta(days=self.expires_days)
+
+        return IssuedRefreshToken(
+            token=token,
+            session_identifier=session_identifier,
+            token_hash=self.hash_refresh_token(token),
+            expires_at=expires_at,
+        )
+
+    def parse_session_identifier(self, token: str) -> str:
+        session_identifier, _, secret = token.partition(".")
+        if not session_identifier or not secret:
+            raise RefreshTokenValidationError("Invalid refresh token format.")
+        return session_identifier
+
+    def hash_refresh_token(self, token: str) -> str:
+        self.parse_session_identifier(token)
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 class PasswordService(Protocol):

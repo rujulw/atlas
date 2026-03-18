@@ -82,6 +82,7 @@ Current client baseline:
 - health check call to `/api/v1/health`
 - registration flow through `/api/v1/auth/register`
 - login flow through `/api/v1/auth/login`
+- refresh flow through `/api/v1/auth/refresh`
 - bearer token storage in local component state for development verification
 
 ## Backend (`server`)
@@ -102,8 +103,12 @@ Current storage API surface:
 Current auth API surface:
 
 - `POST /api/v1/auth/register`: create a user with hashed password persistence
-- `POST /api/v1/auth/login`: verify credentials and issue a signed JWT access token
+- `POST /api/v1/auth/login`: verify credentials and issue an access-token plus refresh-token pair
+- `POST /api/v1/auth/refresh`: validate a refresh session, rotate it, and mint a new access-token plus refresh-token pair
 - `GET /api/v1/auth/me`: validate bearer token, resolve the internal user id, and return current user identity
+- `GET /api/v1/auth/sessions`: list the current user's refresh sessions with device metadata and lifecycle state
+- `DELETE /api/v1/auth/sessions/{session_identifier}`: revoke one refresh session
+- `DELETE /api/v1/auth/sessions`: revoke all refresh sessions for the current user
 
 FastAPI provides the primary HTTP API.
 
@@ -118,6 +123,7 @@ Current implemented metadata tables:
 
 - `users`: authentication identity records
 - `files`: owner-scoped file metadata (name, storage key, checksum, size, and lifecycle flags)
+- `refresh_sessions`: persisted refresh-token session metadata for rotation, revocation, and device visibility
 
 Current user identity baseline:
 
@@ -225,6 +231,9 @@ Current implementation details:
 - login normalizes email input and resolves users through blind-index lookup with plaintext-email fallback for compatibility
 - JWT access token validation is centralized through a shared dependency
 - JWT subject now uses the internal user id instead of email
+- refresh tokens are opaque `session_identifier.secret` values whose hashes are stored server-side
+- refresh token use rotates the backing session and supports single-session or all-session revocation
+- session listing exposes coarse device metadata (`device_name`, `user_agent`, `last_seen_ip`) plus lifecycle timestamps
 
 Next-direction constraints:
 
@@ -272,6 +281,36 @@ The intended session model is:
 - device-aware session tracking with last-used metadata
 
 This is the path from the current access-token-only baseline to a production-sane private-network auth model.
+
+The planned refresh-session shape is:
+
+- one persisted session per login/device context tied to the internal user id
+- an opaque refresh token whose raw secret is held only by the client
+- a stored hash of that refresh secret in the database rather than the raw token
+- lifecycle metadata including creation, expiry, last use, and revocation timestamps
+- coarse device metadata such as device label, user agent, and last seen IP
+
+The current implementation follows this shape and stores refresh-session lifecycle state in the `refresh_sessions` table.
+
+The planned refresh lifecycle is:
+
+1. Login creates a persisted refresh session and returns both an access token and refresh token.
+2. Normal API requests use only the short-lived access token.
+3. Refresh requests validate the presented refresh secret against the stored session record.
+4. Successful refresh rotates the refresh secret, updates session metadata, and invalidates the previous refresh token.
+5. Revoked, expired, or replayed refresh tokens are denied and cannot mint fresh access tokens.
+
+Revocation is intentionally server-driven:
+
+- a single session can be revoked for logout-from-this-device behavior
+- all sessions for a user can be revoked for compromise response or future password-reset flows
+- access tokens are still treated as short-lived bearer credentials and are not individually tracked server-side
+
+Device metadata is for operator and user visibility rather than strong identity proof. Atlas should store enough detail to power a "signed in devices" view without depending on invasive fingerprinting.
+
+Implementation note:
+
+- SQLite-backed tests may materialize timestamp columns as naive datetimes, so refresh/session comparisons normalize database values back to UTC inside the application layer before expiry checks.
 
 ### Internal Service Trust
 

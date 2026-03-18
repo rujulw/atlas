@@ -95,6 +95,9 @@ Design outputs required before implementation expands:
 - define canonical normalization rules for email and username lookup inputs
 - define where ciphertext verification happens relative to blind-index lookup and password verification
 - document key-separation expectations for encryption versus blind-index derivation
+- define the persisted refresh-session record, including hashed refresh secret storage and lifecycle timestamps
+- define refresh rotation and replay-handling rules before refresh endpoints are introduced
+- define the minimum device metadata Atlas tracks for session visibility and targeted revocation
 
 ## Private Platform Direction
 
