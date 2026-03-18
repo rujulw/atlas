@@ -123,7 +123,7 @@ Current version focuses on establishing the private-cloud backend baseline.
 Missing features include:
 
 - Owner-scoped file listing and search
-- Refresh-token sessions and device management
+- Refresh-token sessions with rotation, revocation, and device visibility
 - Encrypted identity fields at rest
 - Internal service trust for future subservices
 - Observability tooling

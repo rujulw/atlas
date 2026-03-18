@@ -232,3 +232,49 @@
   - Introduce schema/migration changes for ciphertext and blind-index columns
   - Preserve one-way password hashing unchanged through the migration
 - References: `docs/architecture.md`, `docs/roadmap.md`
+
+## 12. Refresh-session lifecycle, revocation, and device tracking model
+- Status: accepted
+- Area: backend
+- Decision: add persisted refresh-token sessions that are rotated on use, revocable per session or per user, and annotated with device-facing metadata for session visibility.
+- Context: Atlas now issues only short-lived access tokens. That is enough for the current baseline but does not provide durable sign-in, server-side invalidation, or visibility into which devices currently hold refresh capability.
+- Options considered:
+  - Option A: continue with access-token-only auth and force full re-login after expiry
+  - Option B: issue long-lived refresh JWTs without server-side persistence
+  - Option C: persist refresh sessions server-side and treat refresh tokens as rotating bearer secrets bound to those sessions
+- Tradeoffs:
+  - Pros:
+    - Supports explicit logout and admin/user-driven revocation without waiting for access-token expiry windows
+    - Gives Atlas a device-aware session list with last-used timestamps and coarse client metadata
+    - Provides a clean base for refresh-token rotation and replay/reuse detection
+  - Cons:
+    - Adds session storage, cleanup, and endpoint complexity compared with access-token-only auth
+    - Requires careful token-secret handling so database compromise does not expose live refresh tokens
+    - Needs clear lifecycle rules to avoid accidental lockout or inconsistent rotation behavior
+- Outcome: Atlas will treat refresh capability as a persisted session record plus a client-held opaque refresh secret. Access tokens remain short-lived JWTs, while refresh tokens become rotation-bound credentials that can be individually revoked and audited per device context.
+- Session model:
+  - Each successful login creates a server-side refresh session with a stable session id linked to the internal user id.
+  - The client receives a short-lived access token and an opaque refresh token that encodes or references that session id.
+  - Atlas stores only a hash of the refresh secret, never the raw refresh token value.
+  - Each session records lifecycle timestamps such as `created_at`, `expires_at`, `last_used_at`, `revoked_at`, and an optional `replaced_by_session_id` or rotation marker.
+  - Each session records coarse device metadata such as `device_name`, `user_agent`, and `last_seen_ip` so users can distinguish active sign-ins.
+- Lifecycle rules:
+  - Access tokens are presented to normal API routes and expire quickly without server persistence.
+  - Refresh tokens are presented only to refresh/logout/session-management routes.
+  - A successful refresh rotates the refresh token, updates last-used metadata, and invalidates the previous refresh secret so it cannot be replayed.
+  - A revoked, expired, or rotated-out refresh token must never mint a new access token.
+  - Reuse of an already-rotated refresh token is treated as a compromise signal and should revoke the affected session chain in the implementation phase.
+- Revocation rules:
+  - Users can revoke a single device/session without affecting other active sessions.
+  - Atlas can revoke all sessions for a user during password-reset, compromise-response, or future admin workflows.
+  - Revocation blocks future refresh operations immediately; already-issued access tokens remain valid only until their short expiry.
+- Device tracking scope:
+  - Device metadata is informational and user-supplied or request-derived, not a hard security boundary.
+  - Atlas should expose enough metadata for a user-facing session list without attempting strong browser fingerprinting.
+  - The model assumes multiple concurrent sessions per user across different browsers or devices.
+- Follow-up actions:
+  - Add a refresh-session table and repository interface for hashed refresh secrets and lifecycle metadata
+  - Expand auth responses and routes to issue access/refresh pairs plus refresh and revoke flows
+  - Add session-listing primitives that return device metadata and revocation state
+  - Add tests proving rotated or revoked sessions cannot mint fresh access tokens
+- References: `docs/architecture.md`, `docs/roadmap.md`, `README.md`

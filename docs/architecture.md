@@ -273,6 +273,30 @@ The intended session model is:
 
 This is the path from the current access-token-only baseline to a production-sane private-network auth model.
 
+The planned refresh-session shape is:
+
+- one persisted session per login/device context tied to the internal user id
+- an opaque refresh token whose raw secret is held only by the client
+- a stored hash of that refresh secret in the database rather than the raw token
+- lifecycle metadata including creation, expiry, last use, and revocation timestamps
+- coarse device metadata such as device label, user agent, and last seen IP
+
+The planned refresh lifecycle is:
+
+1. Login creates a persisted refresh session and returns both an access token and refresh token.
+2. Normal API requests use only the short-lived access token.
+3. Refresh requests validate the presented refresh secret against the stored session record.
+4. Successful refresh rotates the refresh secret, updates session metadata, and invalidates the previous refresh token.
+5. Revoked, expired, or replayed refresh tokens are denied and cannot mint fresh access tokens.
+
+Revocation is intentionally server-driven:
+
+- a single session can be revoked for logout-from-this-device behavior
+- all sessions for a user can be revoked for compromise response or future password-reset flows
+- access tokens are still treated as short-lived bearer credentials and are not individually tracked server-side
+
+Device metadata is for operator and user visibility rather than strong identity proof. Atlas should store enough detail to power a "signed in devices" view without depending on invasive fingerprinting.
+
 ### Internal Service Trust
 
 Atlas should become the canonical identity layer for future private subservices on the same server.
