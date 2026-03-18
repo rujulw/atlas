@@ -1,6 +1,6 @@
-from collections.abc import Generator
 import base64
 import json
+from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_db
 from app.db.base_class import Base
 from app.main import app
+from app.models.session import RefreshSession
 from app.models.user import User
 from app.services.auth import JWTAccessTokenService, PBKDF2PasswordService
 from app.services.identity import HMACSHA256BlindIndexService, normalize_email
@@ -24,7 +25,7 @@ def client() -> Generator[TestClient, None, None]:
         poolclass=StaticPool,
     )
     testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine, tables=[User.__table__])
+    Base.metadata.create_all(bind=engine, tables=[User.__table__, RefreshSession.__table__])
 
     def override_get_db() -> Generator[Session, None, None]:
         db = testing_session_local()
@@ -39,7 +40,7 @@ def client() -> Generator[TestClient, None, None]:
         yield test_client
 
     app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine, tables=[User.__table__])
+    Base.metadata.drop_all(bind=engine, tables=[RefreshSession.__table__, User.__table__])
 
 
 def _decode_access_token_payload(token: str) -> dict[str, str | int]:
@@ -66,6 +67,7 @@ def test_register_login_and_access_protected_route(client: TestClient) -> None:
     )
     assert login_response.status_code == 200
     access_token = login_response.json()["access_token"]
+    assert "refresh_token" in login_response.json()
 
     me_response = client.get(
         "/api/v1/auth/me",
@@ -95,6 +97,42 @@ def test_login_token_subject_uses_internal_user_id(client: TestClient) -> None:
     payload = _decode_access_token_payload(login_response.json()["access_token"])
 
     assert payload["sub"] == "1"
+
+
+def test_login_persists_refresh_session_and_returns_refresh_token(
+    client: TestClient,
+) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "user@example.com",
+            "password": "password123",
+            "full_name": "Atlas User",
+        },
+    )
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "user@example.com", "password": "password123"},
+        headers={"User-Agent": "atlas-integration-test"},
+    )
+    assert login_response.status_code == 200
+
+    refresh_token = login_response.json()["refresh_token"]
+    session_identifier, secret = refresh_token.split(".", maxsplit=1)
+
+    with next(client.app.dependency_overrides[get_db]()) as db:
+        stored_session = (
+            db.query(RefreshSession)
+            .filter(RefreshSession.session_identifier == session_identifier)
+            .one()
+        )
+
+    assert secret
+    assert stored_session.user_id == 1
+    assert stored_session.refresh_token_hash != refresh_token
+    assert stored_session.user_agent == "atlas-integration-test"
 
 
 def test_login_fails_for_unregistered_user(client: TestClient) -> None:

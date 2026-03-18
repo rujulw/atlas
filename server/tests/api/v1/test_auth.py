@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from fastapi.testclient import TestClient
 
-from app.api.routes.auth import get_user_repository
+from app.api.routes.auth import get_refresh_session_repository, get_user_repository
 from app.main import app
 from app.services.auth import JWTAccessTokenService, PBKDF2PasswordService
 
@@ -66,6 +66,50 @@ class FakeUserRepository:
         return user
 
 
+class FakeRefreshSessionRecord:
+    def __init__(
+        self,
+        session_identifier: str,
+        user_id: int,
+        refresh_token_hash: str,
+        user_agent: str | None,
+        last_seen_ip: str | None,
+    ) -> None:
+        self.session_identifier = session_identifier
+        self.user_id = user_id
+        self.refresh_token_hash = refresh_token_hash
+        self.user_agent = user_agent
+        self.last_seen_ip = last_seen_ip
+
+
+class FakeRefreshSessionRepository:
+    def __init__(self) -> None:
+        self.created_sessions: list[FakeRefreshSessionRecord] = []
+
+    def create(
+        self,
+        *,
+        session_identifier: str,
+        user_id: int,
+        refresh_token_hash: str,
+        expires_at: object,
+        device_name: str | None = None,
+        user_agent: str | None = None,
+        last_seen_ip: str | None = None,
+        last_used_at: object | None = None,
+    ) -> FakeRefreshSessionRecord:
+        del expires_at, device_name, last_used_at
+        session = FakeRefreshSessionRecord(
+            session_identifier=session_identifier,
+            user_id=user_id,
+            refresh_token_hash=refresh_token_hash,
+            user_agent=user_agent,
+            last_seen_ip=last_seen_ip,
+        )
+        self.created_sessions.append(session)
+        return session
+
+
 def _decode_base64url(value: str) -> dict[str, str | int]:
     padded = value + "=" * (-len(value) % 4)
     raw = base64.urlsafe_b64decode(padded.encode("ascii"))
@@ -74,12 +118,16 @@ def _decode_base64url(value: str) -> dict[str, str | int]:
 
 def test_login_returns_jwt_token() -> None:
     fake_user_repository = FakeUserRepository()
+    fake_refresh_session_repository = FakeRefreshSessionRepository()
     password_service = PBKDF2PasswordService()
     fake_user_repository.create(
         email="user@example.com",
         hashed_password=password_service.hash_password("password123"),
     )
     app.dependency_overrides[get_user_repository] = lambda: fake_user_repository
+    app.dependency_overrides[get_refresh_session_repository] = (
+        lambda: fake_refresh_session_repository
+    )
 
     try:
         response = client.post(
@@ -91,6 +139,7 @@ def test_login_returns_jwt_token() -> None:
 
     assert response.status_code == 200
     assert response.json()["token_type"] == "bearer"
+    assert "refresh_token" in response.json()
     token = response.json()["access_token"]
     token_parts = token.split(".")
     assert len(token_parts) == 3
@@ -101,6 +150,16 @@ def test_login_returns_jwt_token() -> None:
     assert isinstance(payload["iat"], int)
     assert isinstance(payload["exp"], int)
     assert payload["exp"] > payload["iat"]
+    refresh_token = response.json()["refresh_token"]
+    session_identifier, secret = refresh_token.split(".", maxsplit=1)
+    assert session_identifier
+    assert secret
+    assert len(fake_refresh_session_repository.created_sessions) == 1
+    assert (
+        fake_refresh_session_repository.created_sessions[0].session_identifier
+        == session_identifier
+    )
+    assert fake_refresh_session_repository.created_sessions[0].user_id == 1
 
 
 def test_me_requires_bearer_token() -> None:
@@ -137,12 +196,16 @@ def test_me_rejects_token_with_non_integer_subject() -> None:
 
 def test_me_returns_subject_from_valid_token() -> None:
     fake_user_repository = FakeUserRepository()
+    fake_refresh_session_repository = FakeRefreshSessionRepository()
     password_service = PBKDF2PasswordService()
     fake_user_repository.create(
         email="user@example.com",
         hashed_password=password_service.hash_password("password123"),
     )
     app.dependency_overrides[get_user_repository] = lambda: fake_user_repository
+    app.dependency_overrides[get_refresh_session_repository] = (
+        lambda: fake_refresh_session_repository
+    )
 
     try:
         login_response = client.post(

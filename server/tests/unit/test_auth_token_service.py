@@ -6,7 +6,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.services.auth import JWTAccessTokenService, TokenValidationError
+from app.services.auth import (
+    JWTAccessTokenService,
+    OpaqueRefreshTokenService,
+    RefreshTokenValidationError,
+    TokenValidationError,
+)
 
 
 def _decode_base64url(value: str) -> dict[str, str | int]:
@@ -77,3 +82,28 @@ def test_verify_access_token_rejects_expired_token() -> None:
 
     with pytest.raises(TokenValidationError, match="expired"):
         validator.verify_access_token(token)
+
+
+def test_issue_refresh_token_produces_opaque_token_and_hash() -> None:
+    issued_at = datetime(2026, 3, 18, 12, 0, 0, tzinfo=UTC)
+    refresh_token_service = OpaqueRefreshTokenService(
+        expires_days=14,
+        now_provider=lambda: issued_at,
+    )
+
+    issued_token = refresh_token_service.issue_refresh_token()
+    session_identifier = refresh_token_service.parse_session_identifier(issued_token.token)
+
+    assert issued_token.session_identifier == session_identifier
+    assert issued_token.token.startswith(f"{session_identifier}.")
+    assert issued_token.token_hash == hashlib.sha256(
+        issued_token.token.encode("utf-8")
+    ).hexdigest()
+    assert issued_token.expires_at == datetime(2026, 4, 1, 12, 0, 0, tzinfo=UTC)
+
+
+def test_parse_session_identifier_rejects_invalid_refresh_token() -> None:
+    refresh_token_service = OpaqueRefreshTokenService(expires_days=14)
+
+    with pytest.raises(RefreshTokenValidationError, match="format"):
+        refresh_token_service.parse_session_identifier("invalid-token")
