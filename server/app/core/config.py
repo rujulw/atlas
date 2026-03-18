@@ -12,6 +12,7 @@ class Settings:
     DATABASE_URL: str
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
+    REFRESH_TOKEN_EXPIRE_DAYS: int
     IDENTITY_ENCRYPTION_KEY: str
     IDENTITY_BLIND_INDEX_KEY: str
     IDENTITY_KEY_VERSION: str
@@ -25,6 +26,7 @@ settings = Settings(
     DATABASE_URL=os.getenv("DATABASE_URL", "postgresql+psycopg://atlas:atlas@localhost:5432/atlas"),
     SECRET_KEY=os.getenv("SECRET_KEY", "change-me"),
     ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
+    REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "14")),
     IDENTITY_ENCRYPTION_KEY=os.getenv("IDENTITY_ENCRYPTION_KEY", "dev-identity-encryption-key"),
     IDENTITY_BLIND_INDEX_KEY=os.getenv("IDENTITY_BLIND_INDEX_KEY", "dev-identity-blind-index-key"),
     IDENTITY_KEY_VERSION=os.getenv("IDENTITY_KEY_VERSION", "v1"),

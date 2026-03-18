@@ -1,21 +1,31 @@
 """Authentication routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.core.config import settings
+from app.repositories.session import (
+    RefreshSessionRepository,
+    SQLAlchemyRefreshSessionRepository,
+)
 from app.repositories.user import SQLAlchemyUserRepository, UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
 from app.services.auth import (
     JWTAccessTokenService,
-    PBKDF2PasswordService,
+    OpaqueRefreshTokenService,
     PasswordService,
+    PBKDF2PasswordService,
+    RefreshTokenService,
     TokenService,
     TokenValidationError,
 )
-from app.services.identity import BlindIndexService, HMACSHA256BlindIndexService, normalize_email
+from app.services.identity import (
+    BlindIndexService,
+    HMACSHA256BlindIndexService,
+    normalize_email,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -32,12 +42,24 @@ def get_password_service() -> PasswordService:
     return PBKDF2PasswordService()
 
 
+def get_refresh_token_service() -> RefreshTokenService:
+    return OpaqueRefreshTokenService(
+        expires_days=settings.REFRESH_TOKEN_EXPIRE_DAYS,
+    )
+
+
 def get_blind_index_service() -> BlindIndexService:
     return HMACSHA256BlindIndexService(key=settings.IDENTITY_BLIND_INDEX_KEY)
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
     return SQLAlchemyUserRepository(db=db)
+
+
+def get_refresh_session_repository(
+    db: Session = Depends(get_db),
+) -> RefreshSessionRepository:
+    return SQLAlchemyRefreshSessionRepository(db=db)
 
 
 def get_current_subject(
@@ -72,8 +94,13 @@ def get_current_subject(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
+    request: Request,
     payload: LoginRequest,
     token_service: TokenService = Depends(get_token_service),
+    refresh_token_service: RefreshTokenService = Depends(get_refresh_token_service),
+    refresh_session_repository: RefreshSessionRepository = Depends(
+        get_refresh_session_repository
+    ),
     user_repository: UserRepository = Depends(get_user_repository),
     password_service: PasswordService = Depends(get_password_service),
     blind_index_service: BlindIndexService = Depends(get_blind_index_service),
@@ -95,7 +122,19 @@ async def login(
         )
 
     access_token = token_service.issue_access_token(subject=str(user.id))
-    return TokenResponse(access_token=access_token)
+    refresh_token = refresh_token_service.issue_refresh_token()
+    refresh_session_repository.create(
+        session_identifier=refresh_token.session_identifier,
+        user_id=user.id,
+        refresh_token_hash=refresh_token.token_hash,
+        expires_at=refresh_token.expires_at,
+        user_agent=request.headers.get("user-agent"),
+        last_seen_ip=request.client.host if request.client is not None else None,
+    )
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token.token,
+    )
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
