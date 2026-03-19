@@ -98,6 +98,7 @@ async def upload_file(
         size_bytes=file_record.size_bytes,
         checksum_sha256=file_record.checksum_sha256,
         created_at=file_record.created_at,
+        updated_at=file_record.updated_at,
     )
 
 

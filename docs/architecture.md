@@ -102,6 +102,12 @@ Current storage API surface:
 - `POST /api/v1/files/upload`: authenticated multipart upload with metadata persistence
 - `GET /api/v1/files/{file_id}/download`: authenticated file download with owner-scoped metadata lookup
 
+Planned next storage API surface:
+
+- authenticated file listing for the current owner
+- owner-scoped filename search over stored metadata
+- metadata filters for MIME type, size, and time-window queries
+
 Current auth API surface:
 
 - `POST /api/v1/auth/register`: create a user with hashed password persistence
@@ -196,6 +202,51 @@ Storage behavior for upload/download flows is constrained by the following rules
 - Immutability baseline: file content is immutable in v1; updates are represented as new file records.
 - Delete behavior: initial delete support is soft-delete (`is_deleted=true`) to preserve auditability.
 - Service boundaries: storage interfaces separate key generation from binary I/O (`StorageKeyService`, `BlobStorageService`) before concrete implementations are added.
+
+### Browsing and Search Direction
+
+The next storage slice turns Atlas from an upload/download API into an owner-scoped file browser.
+
+The core design choice is that browsing and search operate on file metadata records, not on raw filesystem paths and not on user-supplied owner identifiers.
+
+The intended browse/search contract is:
+
+- every list or search query is implicitly scoped to the authenticated owner
+- soft-deleted rows are excluded from normal browsing results
+- results are paginated and must use deterministic ordering
+- sortable fields are limited to explicit metadata columns owned by Atlas
+- v1 search targets normalized filename-oriented metadata rather than full-text file content
+- metadata filters should start from fields Atlas already persists reliably, such as MIME type, `size_bytes`, and creation/update timestamps
+
+The intended baseline query capabilities are:
+
+- list most recent files for the current owner
+- sort by backend-approved keys such as `created_at`, `updated_at`, `original_name`, or `size_bytes`
+- search by filename text match with normalized case-handling
+- filter by exact MIME type or MIME-type family if the implementation chooses a safe normalized form
+- filter by file-size bounds and created-at windows for predictable metadata queries
+
+This model exists for a few reasons:
+
+- owner scope stays implicit because authorization already comes from Atlas auth, and accepting `owner_id` as a query input would create unnecessary cross-user risk
+- stable sort keys are required before pagination is safe, otherwise pages drift as clients navigate
+- metadata-first search matches what Atlas actually stores today and avoids promising content indexing that does not exist yet
+- the first frontend storage shell needs stable browse/search primitives before UI work starts in earnest
+
+The intended response shape should:
+
+- reuse canonical file metadata fields already returned by upload/download flows where practical
+- include page metadata or cursor state needed to continue iteration
+- echo the active sort/filter/search constraints clearly enough for UI and debugging use
+
+The intended non-goals of this first browse/search slice are:
+
+- direct filesystem traversal semantics
+- arbitrary user-defined query languages
+- content indexing across file bodies
+- directory trees or nested folder abstractions
+
+Those can be layered later if Atlas grows a richer indexing model, but the initial owner-scoped browser should remain narrow and predictable.
 
 ## Synchronization Model
 
@@ -374,9 +425,9 @@ Current architecture does not yet include:
 
 - Background worker system
 - File versioning
-- Refresh token session management
+- Owner-scoped file listing and search implementation
+- Advanced metadata indexing or content search
 - Encrypted identity storage and blind indexes
-- Internal service trust contracts for future subservices
 - Observability stack
 - Multi-node deployments
 

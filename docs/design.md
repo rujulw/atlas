@@ -328,3 +328,50 @@
   - Add validation dependencies for trusted internal services and Atlas-issued user claims
   - Publish deployment guidance for running Atlas and future subservices behind the same tailnet boundary
 - References: `docs/architecture.md`, `docs/roadmap.md`, `README.md`
+
+## 14. Owner-scoped file browsing, search, and metadata-query model
+- Status: accepted
+- Area: backend
+- Decision: define file browsing as an authenticated owner-scoped metadata query surface with explicit pagination, stable sorting, text search, and exact-match metadata filters before implementing listing endpoints.
+- Context: Atlas already supports owner-scoped upload and download, but it is not yet usable as a day-to-day private cloud because users cannot browse their stored files or narrow them predictably. This next slice needs a stable query model first so route, repository, and frontend work all target the same contract.
+- Options considered:
+  - Option A: add a simple list endpoint first and layer search/filter semantics ad hoc afterward
+  - Option B: define the query model up front, including pagination/sort/filter rules, then implement repository and route behavior against that design
+  - Option C: expose broad filesystem-like search inputs directly and let the backend interpret them loosely
+- Tradeoffs:
+  - Pros:
+    - Preserves the same owner-isolation posture already used for upload/download by making owner scope a non-optional query boundary
+    - Reduces frontend and API churn by agreeing early on page shape, sort keys, and filter semantics
+    - Keeps future indexing and media metadata work compatible with one stable browsing contract instead of multiple one-off endpoints
+  - Cons:
+    - Adds upfront design work before users see a visible list endpoint
+    - Constrains early implementation to a narrower v1 query surface instead of an open-ended search language
+- Outcome: Atlas will add browsing/search as a metadata-first API where every query is implicitly bound to the authenticated owner and returns a deterministic paginated result set suitable for both the first storage UI and future service consumers.
+- Query model:
+  - Owner scope is implicit from the authenticated subject and is never accepted as a request parameter.
+  - Soft-deleted rows are excluded from normal browse/search results.
+  - The baseline result set represents stored file metadata, not directory simulation or raw filesystem traversal.
+  - Pagination uses explicit `limit` plus cursor or offset-style page controls chosen during implementation, with deterministic ordering required either way.
+  - Sorting is limited to explicit backend-owned fields such as `created_at`, `updated_at`, `original_name`, and `size_bytes`.
+  - Text search is intentionally shallow in v1 and should match normalized filename-oriented metadata rather than pretend to be full-content indexing.
+  - Metadata filters should begin with exact or range-friendly fields Atlas already owns, such as MIME type, size bounds, and created-at windows.
+- Response-shape expectations:
+  - Each listed item should reuse the canonical metadata fields already established for upload/download responses.
+  - Listing responses should include enough pagination metadata for clients to request the next slice without reconstructing sort state.
+  - Search/filter echo fields should be explicit so clients can reason about what constraints produced the current page.
+- Why this shape:
+  - Owner scope stays implicit because exposing `owner_id` as a client-controlled filter would create unnecessary authorization risk and duplicate what auth already proves.
+  - Stable backend-defined sort keys matter because pagination becomes unreliable if clients can sort on ambiguous or non-index-friendly fields.
+  - Filename-oriented search is the right v1 boundary because Atlas has file metadata today, but it does not yet have a true indexing/content-search subsystem.
+  - Metadata-first browsing comes before the frontend storage shell so the UI can be built against stable primitives rather than reshaping itself around temporary endpoint behavior.
+- Guardrails:
+  - Browsing/search must return `404`/empty-result behavior that does not reveal whether another user's matching file exists.
+  - Query inputs should map to a constrained schema rather than free-form SQL-like filter syntax.
+  - Null or missing metadata fields must sort/filter predictably so results stay stable across pages.
+  - Filename search matching should be normalized consistently to avoid surprising case-sensitivity drift.
+- Follow-up actions:
+  - Add repository query methods for owner-scoped listing with pagination and stable ordering
+  - Add response/query schemas for list/search/filter requests
+  - Add authenticated list endpoint and integration coverage for owner isolation, pagination, and filter behavior
+  - Extend docs once the concrete request/response parameters are implemented
+- References: `docs/architecture.md`, `docs/roadmap.md`, `server/app/repositories/file.py`, `server/app/schemas/file.py`, `server/app/api/routes/files.py`

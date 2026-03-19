@@ -13,6 +13,7 @@ from app.api.routes.files import get_blob_storage_service
 from app.db.base_class import Base
 from app.main import app
 from app.models.file import File
+from app.models.session import RefreshSession
 from app.models.user import User
 from app.services.storage import LocalBlobStorageService
 
@@ -25,7 +26,10 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
         poolclass=StaticPool,
     )
     testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine, tables=[User.__table__, File.__table__])
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[User.__table__, File.__table__, RefreshSession.__table__],
+    )
 
     def override_get_db() -> Generator[Session, None, None]:
         db = testing_session_local()
@@ -43,7 +47,10 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
         yield test_client
 
     app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine, tables=[File.__table__, User.__table__])
+    Base.metadata.drop_all(
+        bind=engine,
+        tables=[RefreshSession.__table__, File.__table__, User.__table__],
+    )
 
 
 def _register_and_login(client: TestClient) -> str:

@@ -73,34 +73,37 @@ These features prepare Atlas for long-running production deployments.
 
 ## Next Priority Slice
 
-Near-term implementation priorities after current baseline:
+Near-term implementation priorities after the current auth/session and service-trust baseline:
 
-- Add encrypted identity fields and complete migration away from plaintext identity storage
-- Migrate JWT subjects from email to internal user ids
-- Introduce refresh-token sessions with revocation and device tracking
-- Define service-to-service trust for future private subservices
-- Add structured server logging for request tracing
-- Add CI checks for backend tests and frontend type/build validation
+- Define the owner-scoped file browsing, search, and metadata-query model
+- Add repository query methods and schemas for predictable list/search behavior
+- Ship an authenticated list endpoint with pagination and stable sorting
+- Add filename search plus metadata filters for MIME type, size, and created-at windows
+- Cover ownership isolation and filter semantics with API tests before frontend storage-shell work begins
 
-Auth-specific delivery constraints for this slice:
+Storage-browse delivery constraints for this slice:
 
-- passwords stay hashed and are never switched to reversible encryption
-- sensitive identity fields such as email, username, and full name move to application-layer encryption
-- login lookup shifts to blind indexes instead of plaintext identity queries
-- future internal subservices consume Atlas identity instead of introducing parallel auth systems
+- browse and search stay implicitly bound to the authenticated owner
+- listing/search results operate on metadata rows, not raw filesystem paths
+- soft-deleted files stay out of default browse/search responses
+- sorting is limited to explicit backend-owned metadata fields
+- v1 search remains metadata-oriented and does not imply body-content indexing
+- query inputs should stay narrow and typed rather than growing into a free-form filter language
 
 Design outputs required before implementation expands:
 
-- document the planned user-record split between internal ids, ciphertext fields, and blind indexes
-- define canonical normalization rules for email and username lookup inputs
-- define where ciphertext verification happens relative to blind-index lookup and password verification
-- document key-separation expectations for encryption versus blind-index derivation
-- define the persisted refresh-session record, including hashed refresh secret storage and lifecycle timestamps
-- define refresh rotation and replay-handling rules before refresh endpoints are introduced
-- define the minimum device metadata Atlas tracks for session visibility and targeted revocation
-- define tailnet-only deployment assumptions for Atlas and future private subservices
-- define where end-user authentication terminates versus where internal service trust begins
-- define issuer, audience, and service-principal expectations before cross-service auth claims are introduced
+- document the owner-scoped browse/search contract and why `owner_id` stays out of client query inputs
+- define the initial pagination and stable-sort rules
+- define the baseline searchable/filterable metadata fields
+- document filename normalization expectations for search behavior
+- define list response metadata needed for page continuation and UI state
+- document which search/indexing capabilities are intentionally out of scope for the first storage-browser slice
+
+Why this slice comes next:
+
+- Atlas already has secure upload/download behavior, but it is still missing the core usability layer needed for day-to-day browsing
+- file listing/search needs to stabilize before the storage UI can be built without churn
+- metadata-query contracts laid down here also become the base for later media-library and indexing work
 
 ## Private Platform Direction
 
@@ -119,18 +122,18 @@ What this means at the product level:
 
 Incremental sequence from here:
 
-1. Add encrypted identity persistence and blind-index lookup without breaking the current auth flow.
-2. Migrate access-token subjects and auth guards to internal user ids.
-3. Introduce refresh-token-backed sessions with revocation and device tracking.
-4. Add internal service trust primitives for private subservices on the same server.
-5. Build the media-service integration on Atlas-issued identity rather than a separate auth layer.
+1. Add owner-scoped file browsing, pagination, and search primitives on top of the existing storage metadata model.
+2. Build the frontend storage shell against those stable browse/search APIs.
+3. Add media-library metadata and service integration on top of Atlas identity and storage.
+4. Return to deeper observability and other platform-hardening work as the product surface expands.
 
-The first of these steps is intentionally a design and schema-modeling pass before migration code lands.
+The first of these steps is intentionally a design pass before repository and endpoint code lands.
 
 The intended payoff of this sequence is that Atlas becomes:
 
 - the private login/account core
 - the persistent storage core
+- a usable owner-scoped file browser
 - the trust anchor for future apps such as media, photo, or document services
 
 ## Open-Source Delivery Model
