@@ -16,6 +16,8 @@ Atlas emphasizes:
 
 This repository is the public core. Instance-specific websites and deployment customizations are expected to live in private repositories.
 
+Atlas is also explicitly moving toward a tailnet-only platform shape where Atlas becomes the private identity core for future self-hosted apps, not just a standalone storage API.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): System structure, runtime model, and security boundaries
@@ -150,6 +152,25 @@ Current token/session behavior:
 - login and refresh responses return both `access_token` and `refresh_token`
 - refresh tokens are opaque rotating bearer secrets backed by persisted server-side sessions
 - Atlas stores only a hash of the refresh token secret, not the raw refresh token
+
+## Platform Direction
+
+Atlas is being built as:
+
+- a private account and session system
+- a storage and metadata core
+- a trust anchor for future private subservices on the same host or tailnet
+
+That means future apps such as a media service should be able to trust Atlas-issued identity instead of building a second password/session system from scratch.
+
+The intended split is:
+
+- Atlas owns end-user authentication
+- Atlas owns session issuance and refresh lifecycle
+- Atlas provides stable internal identity and internal service trust primitives
+- future private apps consume Atlas-issued identity instead of storing user passwords themselves
+
+This is the path from "self-hosted file API" toward "private platform core" for future apps like media, photo, or document services.
 
 ## Development Workflow
 

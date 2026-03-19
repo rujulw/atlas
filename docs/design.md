@@ -296,6 +296,9 @@
     - Adds operational complexity around internal credentials, service validation, and deployment assumptions
     - Tailnet-only deployment reduces public exposure but does not remove the need for careful authorization inside the private network
 - Outcome: Atlas is now explicitly positioned as the private identity core for future internal services, but trust between services must be narrow, claim-driven, and audience-aware rather than implicit because they share a host or tailnet.
+- Strategic role:
+  - Atlas should grow from a private storage API into the shared account, session, and trust core for a broader self-hosted app ecosystem.
+  - Future private apps such as media, music, video, photo, or document services should consume Atlas identity rather than recreate password/session systems.
 - Tailnet-only assumptions:
   - Atlas is intended to run behind a private tailnet boundary and should not assume anonymous public internet traffic as a primary deployment mode.
   - Future private subservices are expected to be reachable only through the same private-network boundary or the same host-local network.
@@ -312,6 +315,9 @@
   - A private subservice validates Atlas-issued claims or a dedicated Atlas-recognized service credential.
   - The subservice applies its own authorization rules for domain objects such as tracks, playlists, libraries, or media catalogs.
   - Atlas does not become a universal policy engine for every downstream resource; it provides identity and trust primitives.
+- Media-service implication:
+  - A future media service should trust Atlas for accounts, login, session refresh, and acting-user identity.
+  - The media service should retain responsibility for media-domain permissions, catalogs, playback rules, and other app-specific policy.
 - Security boundaries:
   - Co-residency on the same machine is not treated as automatic trust.
   - Tailnet membership is not treated as automatic trust.
