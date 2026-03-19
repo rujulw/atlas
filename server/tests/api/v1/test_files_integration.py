@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 import hashlib
 from pathlib import Path
 
@@ -220,6 +221,113 @@ def test_list_files_returns_paginated_owner_scoped_results_with_sorting(
     second_page_payload = second_page_response.json()
     assert len(second_page_payload["items"]) == 1
     assert second_page_payload["items"][0]["original_name"] == "zeta.txt"
+
+
+def test_list_files_supports_owner_scoped_search_and_metadata_filters(
+    client: TestClient,
+) -> None:
+    owner_access_token = _register_and_login_as(
+        client=client,
+        email="owner@example.com",
+        password="password123",
+        full_name="Owner User",
+    )
+    intruder_access_token = _register_and_login_as(
+        client=client,
+        email="intruder@example.com",
+        password="password123",
+        full_name="Intruder User",
+    )
+
+    old_upload = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        files={"file": ("Atlas Plan.txt", b"atlas-plan", "text/plain")},
+    )
+    image_upload = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        files={"file": ("atlas-preview.jpg", b"jpg-bytes", "image/jpeg")},
+    )
+    intruder_upload = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {intruder_access_token}"},
+        files={"file": ("atlas-secret.txt", b"intruder-secret", "text/plain")},
+    )
+
+    assert old_upload.status_code == 201
+    assert image_upload.status_code == 201
+    assert intruder_upload.status_code == 201
+
+    old_file_id = old_upload.json()["id"]
+    new_file_id = image_upload.json()["id"]
+    base_time = datetime(2026, 3, 18, 12, 0, tzinfo=UTC)
+
+    with next(client.app.dependency_overrides[get_db]()) as db:
+        old_file = db.query(File).filter(File.id == old_file_id).one()
+        new_file = db.query(File).filter(File.id == new_file_id).one()
+        old_file.created_at = base_time - timedelta(days=2)
+        new_file.created_at = base_time
+        db.add(old_file)
+        db.add(new_file)
+        db.commit()
+
+    response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        params={
+            "search": " atlas ",
+            "mime_type": "text/plain",
+            "size_bytes_min": 5,
+            "size_bytes_max": 20,
+            "created_after": (base_time - timedelta(days=3)).isoformat(),
+            "created_before": (base_time - timedelta(days=1)).isoformat(),
+            "sort_field": "created_at",
+            "sort_direction": "asc",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["search"] == "atlas"
+    assert payload["mime_type"] == "text/plain"
+    assert payload["size_bytes_min"] == 5
+    assert payload["size_bytes_max"] == 20
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["original_name"] == "Atlas Plan.txt"
+    assert payload["items"][0]["owner_id"] == 1
+
+
+def test_list_files_rejects_invalid_filter_ranges(client: TestClient) -> None:
+    access_token = _register_and_login(client)
+
+    invalid_size_response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={"size_bytes_min": 20, "size_bytes_max": 10},
+    )
+
+    assert invalid_size_response.status_code == 400
+    assert (
+        invalid_size_response.json()["detail"]
+        == "size_bytes_min cannot be greater than size_bytes_max."
+    )
+
+    invalid_time_response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={
+            "created_after": "2026-03-18T12:00:00+00:00",
+            "created_before": "2026-03-17T12:00:00+00:00",
+        },
+    )
+
+    assert invalid_time_response.status_code == 400
+    assert (
+        invalid_time_response.json()["detail"]
+        == "created_after cannot be later than created_before."
+    )
 
 
 def test_download_returns_file_for_owner(client: TestClient) -> None:

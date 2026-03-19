@@ -1,5 +1,6 @@
 """File storage API routes."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -13,6 +14,7 @@ from app.core.config import settings
 from app.models.file import File as FileModel
 from app.models.user import User
 from app.repositories.file import (
+    FileQueryFilters,
     FileRepository,
     SQLAlchemyFileRepository,
 )
@@ -133,20 +135,62 @@ async def list_files(
     offset: Annotated[int, Query(ge=0)] = 0,
     sort_field: FileSortField = "created_at",
     sort_direction: FileSortDirection = "desc",
+    search: Annotated[str | None, Query(max_length=255)] = None,
+    mime_type: Annotated[str | None, Query(max_length=255)] = None,
+    size_bytes_min: Annotated[int | None, Query(ge=0)] = None,
+    size_bytes_max: Annotated[int | None, Query(ge=0)] = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
     current_subject: int = Depends(get_current_subject),
     user_repository: UserRepository = Depends(get_user_repository),
     file_repository: FileRepository = Depends(get_file_repository),
 ) -> FileListResponse:
     user = _resolve_current_user(current_subject, user_repository)
+    normalized_search = search.strip() if search is not None else None
+    if normalized_search == "":
+        normalized_search = None
+
+    if (
+        size_bytes_min is not None
+        and size_bytes_max is not None
+        and size_bytes_min > size_bytes_max
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="size_bytes_min cannot be greater than size_bytes_max.",
+        )
+
+    if (
+        created_after is not None
+        and created_before is not None
+        and created_after > created_before
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="created_after cannot be later than created_before.",
+        )
+
+    filters = FileQueryFilters(
+        search=normalized_search,
+        mime_type=mime_type,
+        size_bytes_min=size_bytes_min,
+        size_bytes_max=size_bytes_max,
+        created_after=created_after,
+        created_before=created_before,
+    )
 
     files = file_repository.list_for_owner(
         owner_id=user.id,
+        filters=filters,
         limit=limit,
         offset=offset,
         sort_field=sort_field,
         sort_direction=sort_direction,
     )
-    total = file_repository.count_for_owner(owner_id=user.id)
+    total = file_repository.count_for_owner(
+        owner_id=user.id,
+        filters=filters,
+    )
 
     return FileListResponse(
         items=[_serialize_file_metadata(file_record) for file_record in files],
@@ -155,6 +199,12 @@ async def list_files(
         offset=offset,
         sort_field=sort_field,
         sort_direction=sort_direction,
+        search=normalized_search,
+        mime_type=mime_type,
+        size_bytes_min=size_bytes_min,
+        size_bytes_max=size_bytes_max,
+        created_after=created_after,
+        created_before=created_before,
     )
 
 
