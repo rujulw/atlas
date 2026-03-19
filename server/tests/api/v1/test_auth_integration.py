@@ -529,6 +529,8 @@ def test_me_rejects_valid_token_for_missing_internal_user(client: TestClient) ->
     token = JWTAccessTokenService(
         secret_key="change-me",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
     ).issue_access_token(subject="999")
 
     response = client.get(

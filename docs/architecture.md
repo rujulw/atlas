@@ -6,6 +6,8 @@ Atlas is a self-hosted personal cloud platform designed around a modular backend
 
 The system runs on personal hardware and exposes services through a structured API. Clients connect through a secure private network instead of a publicly exposed endpoint.
 
+Atlas is also intended to become the private identity core for future internal apps that run behind the same tailnet boundary.
+
 Primary architectural goals:
 
 - Privacy-first infrastructure
@@ -316,12 +318,37 @@ Implementation note:
 
 Atlas should become the canonical identity layer for future private subservices on the same server.
 
+In practical terms, Atlas is not just a storage API. It is intended to become the private account system and identity core for a broader self-hosted app ecosystem running behind the same tailnet boundary.
+
 The expected trust shape is:
 
 - Atlas issues stable user identity based on internal user ids rather than email
 - private subservices validate Atlas-issued identity or dedicated internal service credentials
 - services do not share user passwords or long-lived opaque user secrets
 - service claims should explicitly model issuer, audience, expiry, and optional acting-user context
+
+The deployment assumption is intentionally tailnet-first:
+
+- Atlas is expected to run behind a private tailnet boundary rather than as a public internet identity provider
+- future private subservices should sit behind the same private-network boundary or the same host-local network
+- private-network reachability reduces exposure but does not itself grant trust
+- end-user authentication terminates at Atlas rather than being repeated independently in each private subservice
+
+The trust boundary is intentionally narrow:
+
+- Atlas owns user passwords, refresh-token sessions, and primary user authentication
+- downstream private services consume Atlas-issued identity or dedicated service credentials
+- downstream services still own domain authorization for their own resources
+- shared-host or shared-tailnet placement is not sufficient reason to skip explicit claim validation
+
+This means Atlas should behave more like a private identity core than a catch-all monolith for every downstream policy decision.
+
+The broader platform implication is:
+
+- Atlas terminates end-user authentication
+- Atlas issues user/session identity and internal service trust claims
+- downstream services focus on their own product logic and resource authorization
+- downstream services never need raw user passwords in order to participate in the platform
 
 ### Media Service Integration Shape
 
@@ -333,6 +360,13 @@ The intended split is:
 - the media service consumes Atlas-authenticated user or service identity
 - media-specific authorization remains local to the media service
 - both services remain reachable only through the private tailnet boundary
+
+This is the model that would support future private apps such as:
+
+- a media library service
+- a music-streaming service
+- a video-streaming service
+- other domain-specific private apps that want shared identity without shared password storage
 
 ## Known Gaps
 

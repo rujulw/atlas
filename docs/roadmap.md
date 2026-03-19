@@ -98,6 +98,9 @@ Design outputs required before implementation expands:
 - define the persisted refresh-session record, including hashed refresh secret storage and lifecycle timestamps
 - define refresh rotation and replay-handling rules before refresh endpoints are introduced
 - define the minimum device metadata Atlas tracks for session visibility and targeted revocation
+- define tailnet-only deployment assumptions for Atlas and future private subservices
+- define where end-user authentication terminates versus where internal service trust begins
+- define issuer, audience, and service-principal expectations before cross-service auth claims are introduced
 
 ## Private Platform Direction
 
@@ -108,6 +111,12 @@ Atlas is now explicitly tracking a tailnet-only personal-cloud direction:
 - media-service integration built on Atlas-issued identity
 - database compromise resilience through encrypted identity storage and blind indexes
 
+What this means at the product level:
+
+- Atlas should grow into the shared account and session system for a broader private app ecosystem
+- future private apps should trust Atlas for identity instead of building duplicate password/session systems
+- Atlas should remain focused on identity, session, storage, and trust primitives rather than absorbing every downstream product concern
+
 Incremental sequence from here:
 
 1. Add encrypted identity persistence and blind-index lookup without breaking the current auth flow.
@@ -117,6 +126,12 @@ Incremental sequence from here:
 5. Build the media-service integration on Atlas-issued identity rather than a separate auth layer.
 
 The first of these steps is intentionally a design and schema-modeling pass before migration code lands.
+
+The intended payoff of this sequence is that Atlas becomes:
+
+- the private login/account core
+- the persistent storage core
+- the trust anchor for future apps such as media, photo, or document services
 
 ## Open-Source Delivery Model
 

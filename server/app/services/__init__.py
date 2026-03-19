@@ -1,6 +1,8 @@
 """Business service layer package."""
 
 from app.services.auth import (
+    AccessTokenClaims,
+    InternalServicePrincipal,
     IssuedRefreshToken,
     JWTAccessTokenService,
     OpaqueRefreshTokenService,
@@ -8,6 +10,7 @@ from app.services.auth import (
     PBKDF2PasswordService,
     RefreshTokenService,
     RefreshTokenValidationError,
+    ServiceTokenClaims,
     TokenService,
     TokenValidationError,
 )
@@ -32,6 +35,9 @@ __all__ = [
     "PasswordService",
     "PBKDF2PasswordService",
     "JWTAccessTokenService",
+    "AccessTokenClaims",
+    "InternalServicePrincipal",
+    "ServiceTokenClaims",
     "RefreshTokenService",
     "OpaqueRefreshTokenService",
     "IssuedRefreshToken",

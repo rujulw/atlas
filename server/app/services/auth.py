@@ -30,6 +30,39 @@ class RefreshTokenValidationError(ValueError):
     """Raised when refresh token format or contents are invalid."""
 
 
+@dataclass(frozen=True)
+class AccessTokenClaims:
+    """Validated Atlas access-token claims."""
+
+    subject: str
+    issued_at: int
+    expires_at: int
+    issuer: str | None
+    audience: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class InternalServicePrincipal:
+    """Configuration scaffold for a trusted private subservice principal."""
+
+    service_name: str
+    audience: str
+    can_act_as_user: bool = False
+
+
+@dataclass(frozen=True)
+class ServiceTokenClaims:
+    """Validated claims for an Atlas-issued internal service token."""
+
+    principal: InternalServicePrincipal
+    issuer: str | None
+    audience: tuple[str, ...]
+    subject: str
+    issued_at: int
+    expires_at: int
+    acting_user_id: str | None = None
+
+
 def _utc_now() -> datetime:
     return datetime.now(tz=UTC)
 
@@ -43,6 +76,16 @@ def _b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(padded.encode("ascii"))
 
 
+def _normalize_audience(
+    audience: str | tuple[str, ...] | list[str] | None,
+) -> tuple[str, ...]:
+    if audience is None:
+        return ()
+    if isinstance(audience, str):
+        return (audience,)
+    return tuple(aud for aud in audience if aud)
+
+
 @dataclass(frozen=True)
 class JWTAccessTokenService:
     """Issue signed JWT access tokens using HS256."""
@@ -50,11 +93,51 @@ class JWTAccessTokenService:
     secret_key: str
     expires_minutes: int
     algorithm: str = "HS256"
+    issuer: str | None = None
+    audience: tuple[str, ...] | str | None = None
+    internal_service_expires_minutes: int = 5
     now_provider: Callable[[], datetime] = field(default=_utc_now)
 
     def issue_access_token(self, subject: str) -> str:
+        return self._issue_jwt(
+            subject=subject,
+            expires_minutes=self.expires_minutes,
+            audience=_normalize_audience(self.audience),
+        )
+
+    def issue_service_token(
+        self,
+        principal: InternalServicePrincipal,
+        *,
+        acting_user_id: str | None = None,
+    ) -> str:
+        if acting_user_id is not None and not principal.can_act_as_user:
+            raise ValueError("Service principal cannot act as a user.")
+
+        additional_claims: dict[str, str] = {
+            "token_use": "service",
+            "service_name": principal.service_name,
+        }
+        if acting_user_id is not None:
+            additional_claims["acting_user_id"] = acting_user_id
+
+        return self._issue_jwt(
+            subject=f"service:{principal.service_name}",
+            expires_minutes=self.internal_service_expires_minutes,
+            audience=(principal.audience,),
+            additional_claims=additional_claims,
+        )
+
+    def _issue_jwt(
+        self,
+        *,
+        subject: str,
+        expires_minutes: int,
+        audience: tuple[str, ...] = (),
+        additional_claims: dict[str, str] | None = None,
+    ) -> str:
         now = self.now_provider()
-        expires_at = now + timedelta(minutes=self.expires_minutes)
+        expires_at = now + timedelta(minutes=expires_minutes)
 
         header = {"alg": self.algorithm, "typ": "JWT"}
         payload = {
@@ -62,6 +145,12 @@ class JWTAccessTokenService:
             "iat": int(now.timestamp()),
             "exp": int(expires_at.timestamp()),
         }
+        if self.issuer is not None:
+            payload["iss"] = self.issuer
+        if audience:
+            payload["aud"] = audience[0] if len(audience) == 1 else list(audience)
+        if additional_claims is not None:
+            payload.update(additional_claims)
 
         encoded_header = _b64url_encode(
             json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -80,6 +169,61 @@ class JWTAccessTokenService:
         return f"{signing_input}.{encoded_signature}"
 
     def verify_access_token(self, token: str) -> str:
+        claims = self.verify_access_token_claims(token)
+        return claims.subject
+
+    def verify_access_token_claims(self, token: str) -> AccessTokenClaims:
+        payload = self._validate_token_payload(token)
+        return AccessTokenClaims(
+            subject=payload["sub"],
+            issued_at=payload["iat"],
+            expires_at=payload["exp"],
+            issuer=payload.get("iss"),
+            audience=_normalize_audience(payload.get("aud")),
+        )
+
+    def verify_service_token(
+        self,
+        token: str,
+        *,
+        expected_audience: str | None = None,
+    ) -> ServiceTokenClaims:
+        payload = self._validate_token_payload(
+            token,
+            expected_audience=expected_audience,
+        )
+        token_use = payload.get("token_use")
+        service_name = payload.get("service_name")
+        acting_user_id = payload.get("acting_user_id")
+
+        if token_use != "service":
+            raise TokenValidationError("Invalid service token use.")
+        if not isinstance(service_name, str) or not service_name:
+            raise TokenValidationError("Invalid service token principal.")
+        if acting_user_id is not None and not isinstance(acting_user_id, str):
+            raise TokenValidationError("Invalid acting user id.")
+
+        audience = _normalize_audience(payload.get("aud"))
+        return ServiceTokenClaims(
+            principal=InternalServicePrincipal(
+                service_name=service_name,
+                audience=audience[0] if audience else "",
+                can_act_as_user=acting_user_id is not None,
+            ),
+            issuer=payload.get("iss"),
+            audience=audience,
+            subject=payload["sub"],
+            issued_at=payload["iat"],
+            expires_at=payload["exp"],
+            acting_user_id=acting_user_id,
+        )
+
+    def _validate_token_payload(
+        self,
+        token: str,
+        *,
+        expected_audience: str | None = None,
+    ) -> dict[str, object]:
         token_parts = token.split(".")
         if len(token_parts) != 3:
             raise TokenValidationError("Invalid access token format.")
@@ -104,18 +248,34 @@ class JWTAccessTokenService:
         if not isinstance(header, dict) or header.get("alg") != self.algorithm:
             raise TokenValidationError("Invalid access token header.")
 
-        subject = payload.get("sub") if isinstance(payload, dict) else None
-        expires_at = payload.get("exp") if isinstance(payload, dict) else None
+        if not isinstance(payload, dict):
+            raise TokenValidationError("Invalid access token payload.")
+
+        subject = payload.get("sub")
+        issued_at = payload.get("iat")
+        expires_at = payload.get("exp")
         if not isinstance(subject, str) or not subject:
             raise TokenValidationError("Invalid access token subject.")
+        if not isinstance(issued_at, int):
+            raise TokenValidationError("Invalid access token issued-at.")
         if not isinstance(expires_at, int):
             raise TokenValidationError("Invalid access token expiry.")
+        if self.issuer is not None and payload.get("iss") != self.issuer:
+            raise TokenValidationError("Invalid access token issuer.")
+
+        expected_audiences = _normalize_audience(expected_audience) or _normalize_audience(
+            self.audience
+        )
+        if expected_audiences:
+            actual_audiences = _normalize_audience(payload.get("aud"))
+            if not actual_audiences or not set(expected_audiences).intersection(actual_audiences):
+                raise TokenValidationError("Invalid access token audience.")
 
         now = int(self.now_provider().timestamp())
         if now >= expires_at:
             raise TokenValidationError("Access token has expired.")
 
-        return subject
+        return payload
 
 
 @dataclass(frozen=True)
