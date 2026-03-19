@@ -199,3 +199,45 @@ def test_issue_service_token_rejects_unauthorized_acting_user_context() -> None:
             principal,
             acting_user_id="42",
         )
+
+
+def test_verify_service_token_rejects_user_access_token() -> None:
+    issued_at = datetime(2026, 3, 18, 12, 0, 0, tzinfo=UTC)
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
+        internal_service_expires_minutes=5,
+        now_provider=lambda: issued_at,
+    )
+    access_token = token_service.issue_access_token(subject="1")
+
+    with pytest.raises(TokenValidationError, match="service token use"):
+        token_service.verify_service_token(
+            access_token,
+            expected_audience="atlas-api",
+        )
+
+
+def test_verify_service_token_rejects_wrong_audience() -> None:
+    issued_at = datetime(2026, 3, 18, 12, 0, 0, tzinfo=UTC)
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
+        internal_service_expires_minutes=5,
+        now_provider=lambda: issued_at,
+    )
+    principal = InternalServicePrincipal(
+        service_name="media-service",
+        audience="atlas-internal",
+    )
+    service_token = token_service.issue_service_token(principal)
+
+    with pytest.raises(TokenValidationError, match="audience"):
+        token_service.verify_service_token(
+            service_token,
+            expected_audience="different-internal-audience",
+        )

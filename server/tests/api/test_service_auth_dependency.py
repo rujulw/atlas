@@ -161,3 +161,69 @@ def test_service_auth_dependency_accepts_acting_user_context_when_required() -> 
         "service_name": "media-service",
         "acting_user_id": "42",
     }
+
+
+def test_service_auth_dependency_rejects_user_access_token() -> None:
+    app = FastAPI()
+
+    @app.get("/internal")
+    async def internal_route(
+        service: AuthenticatedServiceContext = Depends(
+            require_service_auth(
+                expected_audience="atlas-api",
+            )
+        ),
+    ) -> dict[str, str | None]:
+        return {
+            "service_name": service.service_name,
+            "acting_user_id": service.acting_user_id,
+        }
+
+    client = TestClient(app)
+    access_token = JWTAccessTokenService(
+        secret_key="change-me",
+        expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
+        internal_service_expires_minutes=5,
+    ).issue_access_token(subject="1")
+
+    response = client.get(
+        "/internal",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid service token use."
+
+
+def test_service_auth_dependency_uses_expected_internal_audience() -> None:
+    app = FastAPI()
+
+    @app.get("/internal")
+    async def internal_route(
+        service: AuthenticatedServiceContext = Depends(
+            require_service_auth(
+                expected_audience="atlas-internal",
+                allowed_service_names=("media-service",),
+            )
+        ),
+    ) -> dict[str, str | None]:
+        return {
+            "service_name": service.service_name,
+            "acting_user_id": service.acting_user_id,
+        }
+
+    client = TestClient(app)
+    token = _make_service_token(
+        service_name="media-service",
+        audience="wrong-internal-audience",
+    )
+
+    response = client.get(
+        "/internal",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid access token audience."
