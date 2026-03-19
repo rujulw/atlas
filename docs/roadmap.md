@@ -98,6 +98,9 @@ Design outputs required before implementation expands:
 - define the persisted refresh-session record, including hashed refresh secret storage and lifecycle timestamps
 - define refresh rotation and replay-handling rules before refresh endpoints are introduced
 - define the minimum device metadata Atlas tracks for session visibility and targeted revocation
+- define tailnet-only deployment assumptions for Atlas and future private subservices
+- define where end-user authentication terminates versus where internal service trust begins
+- define issuer, audience, and service-principal expectations before cross-service auth claims are introduced
 
 ## Private Platform Direction
 

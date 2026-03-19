@@ -276,3 +276,49 @@
   - Add user-facing docs for refresh/session endpoints and environment configuration
   - Consider adding explicit cleanup/retention handling for expired revoked sessions
 - References: `docs/architecture.md`, `docs/roadmap.md`, `README.md`
+
+## 13. Tailnet-only deployment assumptions and internal service trust boundaries
+- Status: accepted
+- Area: backend
+- Decision: treat Atlas as a tailnet-only identity and storage core, with user-facing authentication terminating at Atlas and future private subservices trusting Atlas-issued identity or dedicated internal service credentials instead of sharing user secrets.
+- Context: Atlas is being built for a private personal-cloud environment rather than public internet exposure. The project now has durable user sessions and storage primitives, so the next architectural step is to define how separate private services on the same server or tailnet should trust Atlas without collapsing service boundaries.
+- Options considered:
+  - Option A: expose Atlas and every subservice directly as separately authenticated apps
+  - Option B: make Atlas the canonical identity provider for private subservices and keep subservice trust explicit
+  - Option C: colocate all future capabilities inside Atlas and avoid inter-service trust entirely
+- Tradeoffs:
+  - Pros:
+    - Gives future private services a stable trust anchor based on Atlas-issued user identity
+    - Avoids duplicating password/session systems across media or app-specific services
+    - Preserves clear boundaries so services can evolve independently while remaining inside one private platform
+  - Cons:
+    - Requires explicit issuer, audience, and service-principal contracts before cross-service auth can be considered safe
+    - Adds operational complexity around internal credentials, service validation, and deployment assumptions
+    - Tailnet-only deployment reduces public exposure but does not remove the need for careful authorization inside the private network
+- Outcome: Atlas is now explicitly positioned as the private identity core for future internal services, but trust between services must be narrow, claim-driven, and audience-aware rather than implicit because they share a host or tailnet.
+- Tailnet-only assumptions:
+  - Atlas is intended to run behind a private tailnet boundary and should not assume anonymous public internet traffic as a primary deployment mode.
+  - Future private subservices are expected to be reachable only through the same private-network boundary or the same host-local network.
+  - Network reachability alone is not sufficient trust; private-network placement reduces exposure but does not replace service-level authentication and authorization.
+  - Atlas remains the only service that handles end-user passwords and refresh-token sessions directly.
+- Trust boundaries:
+  - User credentials are presented only to Atlas, never to downstream private subservices.
+  - Atlas-issued user identity should use stable internal user ids, not mutable email addresses, as the principal anchor.
+  - Private subservices may trust Atlas-issued user claims for acting-user context or dedicated service credentials for machine-to-machine calls.
+  - Internal service credentials must be scoped to explicit audiences and capabilities instead of acting as shared root secrets.
+  - Storage access, media authorization, and app-specific permissions remain local concerns of the consuming service even when identity originates from Atlas.
+- Service interaction model:
+  - Atlas authenticates the human user and issues user/session identity.
+  - A private subservice validates Atlas-issued claims or a dedicated Atlas-recognized service credential.
+  - The subservice applies its own authorization rules for domain objects such as tracks, playlists, libraries, or media catalogs.
+  - Atlas does not become a universal policy engine for every downstream resource; it provides identity and trust primitives.
+- Security boundaries:
+  - Co-residency on the same machine is not treated as automatic trust.
+  - Tailnet membership is not treated as automatic trust.
+  - Shared databases between Atlas and future subservices are discouraged unless a later design explicitly justifies them.
+  - Long-lived opaque user tokens should not be forwarded between services as a substitute for explicit internal trust claims.
+- Follow-up actions:
+  - Define concrete issuer, audience, and service-principal claim shapes for private subservices
+  - Add validation dependencies for trusted internal services and Atlas-issued user claims
+  - Publish deployment guidance for running Atlas and future subservices behind the same tailnet boundary
+- References: `docs/architecture.md`, `docs/roadmap.md`, `README.md`

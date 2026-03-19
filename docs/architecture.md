@@ -323,6 +323,22 @@ The expected trust shape is:
 - services do not share user passwords or long-lived opaque user secrets
 - service claims should explicitly model issuer, audience, expiry, and optional acting-user context
 
+The deployment assumption is intentionally tailnet-first:
+
+- Atlas is expected to run behind a private tailnet boundary rather than as a public internet identity provider
+- future private subservices should sit behind the same private-network boundary or the same host-local network
+- private-network reachability reduces exposure but does not itself grant trust
+- end-user authentication terminates at Atlas rather than being repeated independently in each private subservice
+
+The trust boundary is intentionally narrow:
+
+- Atlas owns user passwords, refresh-token sessions, and primary user authentication
+- downstream private services consume Atlas-issued identity or dedicated service credentials
+- downstream services still own domain authorization for their own resources
+- shared-host or shared-tailnet placement is not sufficient reason to skip explicit claim validation
+
+This means Atlas should behave more like a private identity core than a catch-all monolith for every downstream policy decision.
+
 ### Media Service Integration Shape
 
 A future media service on the same private server should trust Atlas identity instead of implementing a separate user system.
