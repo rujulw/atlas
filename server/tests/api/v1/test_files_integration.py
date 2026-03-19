@@ -148,6 +148,16 @@ def test_list_files_requires_authentication(client: TestClient) -> None:
     assert response.json()["detail"] == "Missing bearer token."
 
 
+def test_list_files_rejects_invalid_token(client: TestClient) -> None:
+    response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid access token format."
+
+
 def test_list_files_returns_paginated_owner_scoped_results_with_sorting(
     client: TestClient,
 ) -> None:
@@ -297,6 +307,45 @@ def test_list_files_supports_owner_scoped_search_and_metadata_filters(
     assert len(payload["items"]) == 1
     assert payload["items"][0]["original_name"] == "Atlas Plan.txt"
     assert payload["items"][0]["owner_id"] == 1
+
+
+def test_list_files_excludes_soft_deleted_files_from_results_and_total(
+    client: TestClient,
+) -> None:
+    access_token = _register_and_login(client)
+
+    kept_upload = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {access_token}"},
+        files={"file": ("keep.txt", b"keep", "text/plain")},
+    )
+    deleted_upload = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {access_token}"},
+        files={"file": ("delete.txt", b"delete", "text/plain")},
+    )
+
+    assert kept_upload.status_code == 201
+    assert deleted_upload.status_code == 201
+
+    deleted_file_id = deleted_upload.json()["id"]
+
+    with next(client.app.dependency_overrides[get_db]()) as db:
+        deleted_file = db.query(File).filter(File.id == deleted_file_id).one()
+        deleted_file.is_deleted = True
+        db.add(deleted_file)
+        db.commit()
+
+    response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={"sort_field": "original_name", "sort_direction": "asc"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["original_name"] for item in payload["items"]] == ["keep.txt"]
 
 
 def test_list_files_rejects_invalid_filter_ranges(client: TestClient) -> None:

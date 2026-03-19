@@ -346,7 +346,7 @@
   - Cons:
     - Adds upfront design work before users see a visible list endpoint
     - Constrains early implementation to a narrower v1 query surface instead of an open-ended search language
-- Outcome: Atlas will add browsing/search as a metadata-first API where every query is implicitly bound to the authenticated owner and returns a deterministic paginated result set suitable for both the first storage UI and future service consumers.
+- Outcome: Atlas now exposes browsing/search as a metadata-first API where every query is implicitly bound to the authenticated owner and returns a deterministic paginated result set suitable for both the first storage UI and future service consumers.
 - Query model:
   - Owner scope is implicit from the authenticated subject and is never accepted as a request parameter.
   - Soft-deleted rows are excluded from normal browse/search results.
@@ -370,8 +370,7 @@
   - Null or missing metadata fields must sort/filter predictably so results stay stable across pages.
   - Filename search matching should be normalized consistently to avoid surprising case-sensitivity drift.
 - Follow-up actions:
-  - Add repository query methods for owner-scoped listing with pagination and stable ordering
-  - Add response/query schemas for list/search/filter requests
-  - Add authenticated list endpoint and integration coverage for owner isolation, pagination, and filter behavior
-  - Extend docs once the concrete request/response parameters are implemented
+  - Build the frontend storage shell against the now-stable list/search/query contract
+  - Consider whether MIME-family filters deserve a first-class query parameter or should remain exact-match only
+  - Add more search/list edge-case coverage as the storage UI begins consuming pagination and filter state
 - References: `docs/architecture.md`, `docs/roadmap.md`, `server/app/repositories/file.py`, `server/app/schemas/file.py`, `server/app/api/routes/files.py`

@@ -100,13 +100,8 @@ The backend is responsible for:
 Current storage API surface:
 
 - `POST /api/v1/files/upload`: authenticated multipart upload with metadata persistence
+- `GET /api/v1/files`: authenticated owner-scoped file listing with pagination, stable sorting, filename search, and metadata filters
 - `GET /api/v1/files/{file_id}/download`: authenticated file download with owner-scoped metadata lookup
-
-Planned next storage API surface:
-
-- authenticated file listing for the current owner
-- owner-scoped filename search over stored metadata
-- metadata filters for MIME type, size, and time-window queries
 
 Current auth API surface:
 
@@ -205,11 +200,11 @@ Storage behavior for upload/download flows is constrained by the following rules
 
 ### Browsing and Search Direction
 
-The next storage slice turns Atlas from an upload/download API into an owner-scoped file browser.
+The current storage slice turns Atlas from an upload/download API into an owner-scoped file browser.
 
 The core design choice is that browsing and search operate on file metadata records, not on raw filesystem paths and not on user-supplied owner identifiers.
 
-The intended browse/search contract is:
+The implemented browse/search contract is:
 
 - every list or search query is implicitly scoped to the authenticated owner
 - soft-deleted rows are excluded from normal browsing results
@@ -218,7 +213,7 @@ The intended browse/search contract is:
 - v1 search targets normalized filename-oriented metadata rather than full-text file content
 - metadata filters should start from fields Atlas already persists reliably, such as MIME type, `size_bytes`, and creation/update timestamps
 
-The intended baseline query capabilities are:
+The current baseline query capabilities are:
 
 - list most recent files for the current owner
 - sort by backend-approved keys such as `created_at`, `updated_at`, `original_name`, or `size_bytes`
@@ -233,7 +228,7 @@ This model exists for a few reasons:
 - metadata-first search matches what Atlas actually stores today and avoids promising content indexing that does not exist yet
 - the first frontend storage shell needs stable browse/search primitives before UI work starts in earnest
 
-The intended response shape should:
+The current response shape:
 
 - reuse canonical file metadata fields already returned by upload/download flows where practical
 - include page metadata or cursor state needed to continue iteration
@@ -246,7 +241,7 @@ The intended non-goals of this first browse/search slice are:
 - content indexing across file bodies
 - directory trees or nested folder abstractions
 
-Those can be layered later if Atlas grows a richer indexing model, but the initial owner-scoped browser should remain narrow and predictable.
+Those can be layered later if Atlas grows a richer indexing model, but the initial owner-scoped browser remains intentionally narrow and predictable.
 
 ## Synchronization Model
 
@@ -425,7 +420,6 @@ Current architecture does not yet include:
 
 - Background worker system
 - File versioning
-- Owner-scoped file listing and search implementation
 - Advanced metadata indexing or content search
 - Encrypted identity storage and blind indexes
 - Observability stack
