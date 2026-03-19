@@ -27,6 +27,7 @@ Current baseline progress (completed):
 - Client integration to backend health/auth endpoints
 - Dockerized local development stack with diagnostics
 - Owner-scoped upload/download storage pipeline with metadata persistence
+- Owner-scoped file listing, pagination, search, and metadata-query support
 
 ## 1. Core Backend
 
@@ -73,34 +74,26 @@ These features prepare Atlas for long-running production deployments.
 
 ## Next Priority Slice
 
-Near-term implementation priorities after current baseline:
+Near-term implementation priorities after the completed storage browse/search backend slice:
 
-- Add encrypted identity fields and complete migration away from plaintext identity storage
-- Migrate JWT subjects from email to internal user ids
-- Introduce refresh-token sessions with revocation and device tracking
-- Define service-to-service trust for future private subservices
-- Add structured server logging for request tracing
-- Add CI checks for backend tests and frontend type/build validation
+- Build the frontend storage shell against the now-stable listing/search API surface
+- Add auth-aware session bootstrap and browse-state handling in the client
+- Expose upload, search, list, download, and empty/loading/error states in a usable file-browser UI
+- Add frontend tests for auth-shell and storage-browser interactions
+- Keep backend browse/search contracts stable while the client begins consuming them
 
-Auth-specific delivery constraints for this slice:
+Frontend-storage delivery constraints for this slice:
 
-- passwords stay hashed and are never switched to reversible encryption
-- sensitive identity fields such as email, username, and full name move to application-layer encryption
-- login lookup shifts to blind indexes instead of plaintext identity queries
-- future internal subservices consume Atlas identity instead of introducing parallel auth systems
+- the UI should treat Atlas auth as the only source of acting-user context
+- storage browsing should consume the owner-scoped API contract as-is rather than reconstructing ownership or sort behavior client-side
+- pagination, search, and filter state should map directly to backend query params
+- the first storage UI should stay honest about current backend capabilities and not imply directory trees or content indexing that do not yet exist
 
-Design outputs required before implementation expands:
+Why this slice comes next:
 
-- document the planned user-record split between internal ids, ciphertext fields, and blind indexes
-- define canonical normalization rules for email and username lookup inputs
-- define where ciphertext verification happens relative to blind-index lookup and password verification
-- document key-separation expectations for encryption versus blind-index derivation
-- define the persisted refresh-session record, including hashed refresh secret storage and lifecycle timestamps
-- define refresh rotation and replay-handling rules before refresh endpoints are introduced
-- define the minimum device metadata Atlas tracks for session visibility and targeted revocation
-- define tailnet-only deployment assumptions for Atlas and future private subservices
-- define where end-user authentication terminates versus where internal service trust begins
-- define issuer, audience, and service-principal expectations before cross-service auth claims are introduced
+- Atlas now has the backend primitives needed for day-to-day storage browsing
+- the missing piece is a real client shell that makes those flows usable without hand-driving the API
+- media-library work should build on stable browse/search primitives and a real app shell rather than on ad hoc backend-only workflows
 
 ## Private Platform Direction
 
@@ -119,18 +112,18 @@ What this means at the product level:
 
 Incremental sequence from here:
 
-1. Add encrypted identity persistence and blind-index lookup without breaking the current auth flow.
-2. Migrate access-token subjects and auth guards to internal user ids.
-3. Introduce refresh-token-backed sessions with revocation and device tracking.
-4. Add internal service trust primitives for private subservices on the same server.
-5. Build the media-service integration on Atlas-issued identity rather than a separate auth layer.
+1. Add owner-scoped file browsing, pagination, and search primitives on top of the existing storage metadata model.
+2. Build the frontend storage shell against those stable browse/search APIs.
+3. Add media-library metadata and service integration on top of Atlas identity and storage.
+4. Return to deeper observability and other platform-hardening work as the product surface expands.
 
-The first of these steps is intentionally a design and schema-modeling pass before migration code lands.
+The first of these steps is intentionally a frontend implementation pass now that the backend browse/search contract is in place.
 
 The intended payoff of this sequence is that Atlas becomes:
 
 - the private login/account core
 - the persistent storage core
+- a usable owner-scoped file browser
 - the trust anchor for future apps such as media, photo, or document services
 
 ## Open-Source Delivery Model

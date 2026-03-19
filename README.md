@@ -125,8 +125,7 @@ Current version focuses on establishing the private-cloud backend baseline.
 
 Missing features include:
 
-- Owner-scoped file listing and search
-- Refresh-token sessions with rotation, revocation, and device visibility
+- Frontend storage shell for list/search/upload/download flows
 - Encrypted identity fields at rest
 - Internal service trust for future subservices
 - Observability tooling
@@ -152,6 +151,22 @@ Current token/session behavior:
 - login and refresh responses return both `access_token` and `refresh_token`
 - refresh tokens are opaque rotating bearer secrets backed by persisted server-side sessions
 - Atlas stores only a hash of the refresh token secret, not the raw refresh token
+
+## Storage API Baseline
+
+Current storage endpoints:
+
+- `POST /api/v1/files/upload`: store a file and persist owner-scoped metadata
+- `GET /api/v1/files`: list the current owner's files with pagination, sorting, filename search, and metadata filters
+- `GET /api/v1/files/{file_id}/download`: download a file only when it belongs to the authenticated owner
+
+Current storage-query behavior:
+
+- file browsing is always scoped to the authenticated owner
+- listing supports `limit`, `offset`, `sort_field`, and `sort_direction`
+- filename search is metadata-first and does not search file contents
+- metadata filters support exact MIME type plus size/time-window bounds
+- soft-deleted files are excluded from normal browse/search results
 
 ## Platform Direction
 

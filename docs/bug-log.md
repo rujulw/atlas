@@ -1,5 +1,51 @@
 # Bug Log
 
+## 2026-03-18 - Avoided cross-user file enumeration in listing and search queries
+- Status: fixed
+- Severity: high
+- Symptom: file browsing endpoints can leak another user's filenames, counts, or search hits if query logic is built as a generic metadata lookup instead of an auth-scoped repository query.
+- Root cause: listing/search behavior was easy to add on top of the `files` table without forcing every query through the authenticated owner boundary.
+- Fix: added owner-scoped repository query methods (`list_for_owner`, `count_for_owner`) and wired the listing endpoint so owner scope always comes from the authenticated subject instead of client input.
+- Verification: repository and API tests cover owner-only listing/search behavior and prove another user's uploads do not affect returned items or totals.
+- Files touched:
+  - `server/app/repositories/file.py`
+  - `server/app/api/routes/files.py`
+  - `server/tests/unit/test_file_repository.py`
+  - `server/tests/api/v1/test_files_integration.py`
+- Linked commit/PR: pending
+- Notes: this goes hand in hand with the earlier upload/download ownership model, so browsing did not become the place where storage isolation regressed.
+
+## 2026-03-18 - Avoided unstable file pagination and sort drift in the first browse endpoint
+- Status: fixed
+- Severity: medium
+- Symptom: paginated file listing can duplicate or skip rows across pages if sorting is left implicit or tied to unstable client-controlled fields.
+- Root cause: the first listing endpoint needed a deterministic ordering contract before pagination became trustworthy.
+- Fix: constrained list sorting to explicit metadata fields, added stable secondary `id` ordering in repository queries, and exposed typed pagination/sort parameters in the API response contract.
+- Verification: repository and API tests cover paginated listing with stable ordering by `original_name`, including page-by-page result expectations.
+- Files touched:
+  - `server/app/repositories/file.py`
+  - `server/app/schemas/file.py`
+  - `server/app/api/routes/files.py`
+  - `server/tests/unit/test_file_repository.py`
+  - `server/tests/api/v1/test_files_integration.py`
+- Linked commit/PR: pending
+- Notes: this is why pagination/sorting landed before richer query exposure; the browse baseline needed deterministic behavior before it needed more knobs.
+
+## 2026-03-18 - Avoided deleted-file visibility and ambiguous metadata-filter behavior in browse/search
+- Status: fixed
+- Severity: medium
+- Symptom: file list/search routes can surface soft-deleted rows or behave unpredictably when range filters are inverted, which makes totals unreliable and user-visible query results confusing.
+- Root cause: browse/search logic needed explicit handling for soft-delete exclusion and invalid size/time windows instead of relying on implicit empty results.
+- Fix: repository queries exclude `is_deleted=true` rows by default, and the listing endpoint now validates size/time ranges before executing metadata-filtered searches.
+- Verification: repository coverage excludes deleted rows from counts, and API tests verify soft-deleted files stay hidden plus invalid range filters return `400`.
+- Files touched:
+  - `server/app/repositories/file.py`
+  - `server/app/api/routes/files.py`
+  - `server/tests/unit/test_file_repository.py`
+  - `server/tests/api/v1/test_files_integration.py`
+- Linked commit/PR: pending
+- Notes: this explains why the first metadata-query support is narrow and typed instead of silently accepting contradictory filter input.
+
 ## 2026-03-18 - Avoided refresh token replay leaving a rotated session chain active
 - Status: fixed
 - Severity: high

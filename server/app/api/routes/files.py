@@ -1,18 +1,31 @@
 """File storage API routes."""
 
+from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.routes.auth import get_current_subject
 from app.core.config import settings
+from app.models.file import File as FileModel
 from app.models.user import User
-from app.repositories.file import FileRepository, SQLAlchemyFileRepository
+from app.repositories.file import (
+    FileQueryFilters,
+    FileRepository,
+    SQLAlchemyFileRepository,
+)
 from app.repositories.user import SQLAlchemyUserRepository, UserRepository
-from app.schemas.file import FileUploadResponse
+from app.schemas.file import (
+    FileListResponse,
+    FileMetadataResponse,
+    FileSortDirection,
+    FileSortField,
+    FileUploadResponse,
+)
 from app.services.storage import (
     BlobStorageService,
     LocalBlobStorageService,
@@ -50,6 +63,20 @@ def _resolve_current_user(
             detail="Authenticated user not found.",
         )
     return user
+
+
+def _serialize_file_metadata(file_record: FileModel) -> FileMetadataResponse:
+    return FileMetadataResponse(
+        id=file_record.id,
+        owner_id=file_record.owner_id,
+        original_name=file_record.original_name,
+        storage_key=file_record.storage_key,
+        mime_type=file_record.mime_type,
+        size_bytes=file_record.size_bytes,
+        checksum_sha256=file_record.checksum_sha256,
+        created_at=file_record.created_at,
+        updated_at=file_record.updated_at,
+    )
 
 
 @router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -98,6 +125,86 @@ async def upload_file(
         size_bytes=file_record.size_bytes,
         checksum_sha256=file_record.checksum_sha256,
         created_at=file_record.created_at,
+        updated_at=file_record.updated_at,
+    )
+
+
+@router.get("", response_model=FileListResponse)
+async def list_files(
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    sort_field: FileSortField = "created_at",
+    sort_direction: FileSortDirection = "desc",
+    search: Annotated[str | None, Query(max_length=255)] = None,
+    mime_type: Annotated[str | None, Query(max_length=255)] = None,
+    size_bytes_min: Annotated[int | None, Query(ge=0)] = None,
+    size_bytes_max: Annotated[int | None, Query(ge=0)] = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+    current_subject: int = Depends(get_current_subject),
+    user_repository: UserRepository = Depends(get_user_repository),
+    file_repository: FileRepository = Depends(get_file_repository),
+) -> FileListResponse:
+    user = _resolve_current_user(current_subject, user_repository)
+    normalized_search = search.strip() if search is not None else None
+    if normalized_search == "":
+        normalized_search = None
+
+    if (
+        size_bytes_min is not None
+        and size_bytes_max is not None
+        and size_bytes_min > size_bytes_max
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="size_bytes_min cannot be greater than size_bytes_max.",
+        )
+
+    if (
+        created_after is not None
+        and created_before is not None
+        and created_after > created_before
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="created_after cannot be later than created_before.",
+        )
+
+    filters = FileQueryFilters(
+        search=normalized_search,
+        mime_type=mime_type,
+        size_bytes_min=size_bytes_min,
+        size_bytes_max=size_bytes_max,
+        created_after=created_after,
+        created_before=created_before,
+    )
+
+    files = file_repository.list_for_owner(
+        owner_id=user.id,
+        filters=filters,
+        limit=limit,
+        offset=offset,
+        sort_field=sort_field,
+        sort_direction=sort_direction,
+    )
+    total = file_repository.count_for_owner(
+        owner_id=user.id,
+        filters=filters,
+    )
+
+    return FileListResponse(
+        items=[_serialize_file_metadata(file_record) for file_record in files],
+        total=total,
+        limit=limit,
+        offset=offset,
+        sort_field=sort_field,
+        sort_direction=sort_direction,
+        search=normalized_search,
+        mime_type=mime_type,
+        size_bytes_min=size_bytes_min,
+        size_bytes_max=size_bytes_max,
+        created_after=created_after,
+        created_before=created_before,
     )
 
 
