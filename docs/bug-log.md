@@ -1,5 +1,47 @@
 # Bug Log
 
+## 2026-03-18 - Avoided refresh token replay leaving a rotated session chain active
+- Status: fixed
+- Severity: high
+- Symptom: once refresh-token rotation exists, replaying an older refresh token can leave the newly rotated session usable unless reuse is treated as a compromise event.
+- Root cause: simple refresh rotation revokes only the presented session unless the implementation explicitly invalidates the rest of the active session chain on token-hash mismatch or rotated-token reuse.
+- Fix: refresh flow now revokes all active sessions for the user when a rotated token is replayed or when the stored refresh-token hash no longer matches the presented token.
+- Verification: auth integration coverage proves that reusing an older refresh token returns `401` and invalidates the rotated replacement session as well.
+- Files touched:
+  - `server/app/api/routes/auth.py`
+  - `server/tests/api/v1/test_auth_integration.py`
+- Linked commit/PR: pending
+- Notes: this is why refresh tokens were implemented as persisted server-side sessions with rotation metadata instead of as standalone long-lived bearer tokens.
+
+## 2026-03-18 - Avoided internal route auth bypass via user access tokens or wrong audiences
+- Status: fixed
+- Severity: high
+- Symptom: private service routes can accidentally accept normal user access tokens or tokens minted for the wrong audience if they reuse generic bearer validation without service-specific claim checks.
+- Root cause: issuer and signature validation alone do not distinguish end-user API tokens from internal service credentials or enforce the intended target audience for machine-to-machine calls.
+- Fix: added `require_service_auth(...)` with explicit service-token validation, expected internal audience enforcement, and `token_use=service` checks.
+- Verification: dependency tests cover valid service access plus rejection of user access tokens, disallowed service names, and wrong internal audiences.
+- Files touched:
+  - `server/app/api/deps.py`
+  - `server/tests/api/test_service_auth_dependency.py`
+  - `server/app/services/auth.py`
+- Linked commit/PR: pending
+- Notes: this goes hand in hand with defining issuer/audience/service-principal claims before wiring internal trust into future services.
+
+## 2026-03-18 - Avoided unauthorized acting-user impersonation in service-token scaffolding
+- Status: fixed
+- Severity: medium
+- Symptom: an internal service token model can accidentally allow any trusted service to attach arbitrary acting-user context if impersonation is not gated separately from ordinary service identity.
+- Root cause: service-principal scaffolding needs an explicit capability boundary for "can act as user" rather than treating all trusted services as interchangeable.
+- Fix: service-token issuance now rejects acting-user context unless the principal is explicitly marked `can_act_as_user`, and service-auth dependencies can require acting-user context only where needed.
+- Verification: unit and dependency tests cover rejection of unauthorized acting-user issuance and enforcement of acting-user requirements on internal routes.
+- Files touched:
+  - `server/app/services/auth.py`
+  - `server/app/api/deps.py`
+  - `server/tests/unit/test_auth_token_service.py`
+  - `server/tests/api/test_service_auth_dependency.py`
+- Linked commit/PR: pending
+- Notes: this is why internal service trust was modeled with explicit principal capabilities instead of one shared "trusted service" credential shape.
+
 ## 2026-03-05 - Debugged storage access control and missing-content edge paths via API integration suite
 - Status: fixed
 - Severity: high
