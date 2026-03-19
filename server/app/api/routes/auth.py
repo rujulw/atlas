@@ -48,6 +48,9 @@ def get_token_service() -> TokenService:
     return JWTAccessTokenService(
         secret_key=settings.SECRET_KEY,
         expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        issuer=settings.TOKEN_ISSUER,
+        audience=settings.USER_ACCESS_TOKEN_AUDIENCE,
+        internal_service_expires_minutes=settings.INTERNAL_SERVICE_TOKEN_EXPIRE_MINUTES,
     )
 
 

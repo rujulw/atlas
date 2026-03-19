@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.services.auth import (
+    InternalServicePrincipal,
     JWTAccessTokenService,
     OpaqueRefreshTokenService,
     RefreshTokenValidationError,
@@ -29,6 +30,8 @@ def test_issue_access_token_produces_signed_jwt() -> None:
     token_service = JWTAccessTokenService(
         secret_key="test-secret",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
         now_provider=lambda: issued_at,
     )
 
@@ -39,6 +42,8 @@ def test_issue_access_token_produces_signed_jwt() -> None:
 
     assert header == {"alg": "HS256", "typ": "JWT"}
     assert payload["sub"] == "1"
+    assert payload["iss"] == "atlas"
+    assert payload["aud"] == "atlas-api"
     assert payload["iat"] == int(issued_at.timestamp())
     assert payload["exp"] == int(issued_at.timestamp()) + (30 * 60)
 
@@ -56,6 +61,8 @@ def test_verify_access_token_returns_subject() -> None:
     token_service = JWTAccessTokenService(
         secret_key="test-secret",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
         now_provider=lambda: issued_at,
     )
     token = token_service.issue_access_token(subject="1")
@@ -70,6 +77,8 @@ def test_verify_access_token_rejects_expired_token() -> None:
     token_service = JWTAccessTokenService(
         secret_key="test-secret",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
         now_provider=lambda: issued_at,
     )
     token = token_service.issue_access_token(subject="1")
@@ -77,6 +86,8 @@ def test_verify_access_token_rejects_expired_token() -> None:
     validator = JWTAccessTokenService(
         secret_key="test-secret",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
         now_provider=lambda: datetime(2026, 3, 4, 12, 40, 0, tzinfo=UTC),
     )
 
@@ -107,3 +118,84 @@ def test_parse_session_identifier_rejects_invalid_refresh_token() -> None:
 
     with pytest.raises(RefreshTokenValidationError, match="format"):
         refresh_token_service.parse_session_identifier("invalid-token")
+
+
+def test_verify_access_token_rejects_wrong_issuer_or_audience() -> None:
+    issued_at = datetime(2026, 3, 4, 12, 0, 0, tzinfo=UTC)
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
+        now_provider=lambda: issued_at,
+    )
+    token = token_service.issue_access_token(subject="1")
+
+    with pytest.raises(TokenValidationError, match="issuer"):
+        JWTAccessTokenService(
+            secret_key="test-secret",
+            expires_minutes=30,
+            issuer="different-issuer",
+            audience="atlas-api",
+            now_provider=lambda: issued_at,
+        ).verify_access_token(token)
+
+    with pytest.raises(TokenValidationError, match="audience"):
+        JWTAccessTokenService(
+            secret_key="test-secret",
+            expires_minutes=30,
+            issuer="atlas",
+            audience="different-audience",
+            now_provider=lambda: issued_at,
+        ).verify_access_token(token)
+
+
+def test_issue_and_verify_internal_service_token() -> None:
+    issued_at = datetime(2026, 3, 18, 12, 0, 0, tzinfo=UTC)
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
+        internal_service_expires_minutes=5,
+        now_provider=lambda: issued_at,
+    )
+    principal = InternalServicePrincipal(
+        service_name="media-service",
+        audience="atlas-internal",
+        can_act_as_user=True,
+    )
+
+    token = token_service.issue_service_token(
+        principal,
+        acting_user_id="42",
+    )
+    claims = token_service.verify_service_token(
+        token,
+        expected_audience="atlas-internal",
+    )
+
+    assert claims.principal.service_name == "media-service"
+    assert claims.audience == ("atlas-internal",)
+    assert claims.acting_user_id == "42"
+    assert claims.subject == "service:media-service"
+    assert claims.issuer == "atlas"
+
+
+def test_issue_service_token_rejects_unauthorized_acting_user_context() -> None:
+    token_service = JWTAccessTokenService(
+        secret_key="test-secret",
+        expires_minutes=30,
+        internal_service_expires_minutes=5,
+    )
+    principal = InternalServicePrincipal(
+        service_name="indexer",
+        audience="atlas-internal",
+        can_act_as_user=False,
+    )
+
+    with pytest.raises(ValueError, match="cannot act as a user"):
+        token_service.issue_service_token(
+            principal,
+            acting_user_id="42",
+        )

@@ -238,6 +238,8 @@ def test_me_rejects_token_with_non_integer_subject() -> None:
     token = JWTAccessTokenService(
         secret_key="change-me",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
     ).issue_access_token(subject="user@example.com")
 
     response = client.get(
@@ -355,6 +357,8 @@ def test_list_sessions_returns_current_users_sessions() -> None:
     access_token = JWTAccessTokenService(
         secret_key="change-me",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
     ).issue_access_token(subject=str(user.id))
     app.dependency_overrides[get_user_repository] = lambda: fake_user_repository
     app.dependency_overrides[get_refresh_session_repository] = (
@@ -393,6 +397,8 @@ def test_revoke_session_marks_current_users_session_revoked() -> None:
     access_token = JWTAccessTokenService(
         secret_key="change-me",
         expires_minutes=30,
+        issuer="atlas",
+        audience="atlas-api",
     ).issue_access_token(subject=str(user.id))
     app.dependency_overrides[get_user_repository] = lambda: fake_user_repository
     app.dependency_overrides[get_refresh_session_repository] = (
