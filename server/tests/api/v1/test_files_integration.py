@@ -140,6 +140,88 @@ def test_upload_rejects_invalid_token(client: TestClient) -> None:
     assert response.json()["detail"] == "Invalid access token format."
 
 
+def test_list_files_requires_authentication(client: TestClient) -> None:
+    response = client.get("/api/v1/files")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Missing bearer token."
+
+
+def test_list_files_returns_paginated_owner_scoped_results_with_sorting(
+    client: TestClient,
+) -> None:
+    owner_access_token = _register_and_login_as(
+        client=client,
+        email="owner@example.com",
+        password="password123",
+        full_name="Owner User",
+    )
+    intruder_access_token = _register_and_login_as(
+        client=client,
+        email="intruder@example.com",
+        password="password123",
+        full_name="Intruder User",
+    )
+
+    owner_upload_one = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        files={"file": ("zeta.txt", b"zeta", "text/plain")},
+    )
+    owner_upload_two = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        files={"file": ("alpha.txt", b"alpha", "text/plain")},
+    )
+    intruder_upload = client.post(
+        "/api/v1/files/upload",
+        headers={"Authorization": f"Bearer {intruder_access_token}"},
+        files={"file": ("intruder.txt", b"intruder", "text/plain")},
+    )
+
+    assert owner_upload_one.status_code == 201
+    assert owner_upload_two.status_code == 201
+    assert intruder_upload.status_code == 201
+
+    response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        params={
+            "limit": 1,
+            "offset": 0,
+            "sort_field": "original_name",
+            "sort_direction": "asc",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 2
+    assert payload["limit"] == 1
+    assert payload["offset"] == 0
+    assert payload["sort_field"] == "original_name"
+    assert payload["sort_direction"] == "asc"
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["original_name"] == "alpha.txt"
+    assert payload["items"][0]["owner_id"] == 1
+
+    second_page_response = client.get(
+        "/api/v1/files",
+        headers={"Authorization": f"Bearer {owner_access_token}"},
+        params={
+            "limit": 1,
+            "offset": 1,
+            "sort_field": "original_name",
+            "sort_direction": "asc",
+        },
+    )
+
+    assert second_page_response.status_code == 200
+    second_page_payload = second_page_response.json()
+    assert len(second_page_payload["items"]) == 1
+    assert second_page_payload["items"][0]["original_name"] == "zeta.txt"
+
+
 def test_download_returns_file_for_owner(client: TestClient) -> None:
     access_token = _register_and_login(client)
     upload_response = client.post(
