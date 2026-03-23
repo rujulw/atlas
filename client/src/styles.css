@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+@keyframes hero-cta-sweep {
+  0% {
+    transform: translateX(-160%) skewX(-18deg);
+    opacity: 0;
+  }
+
+  18% {
+    opacity: 0.26;
+  }
+
+  42% {
+    transform: translateX(240%) skewX(-18deg);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
 @layer base {
   :root {
     color-scheme: dark;
@@ -12,13 +33,18 @@
     min-height: 100%;
   }
 
+  html {
+    background: linear-gradient(145deg, #040713 0%, #081122 42%, #040915 100%);
+    overscroll-behavior-y: none;
+    scroll-behavior: smooth;
+  }
+
   body {
     margin: 0;
     color: #edf2ff;
-    background:
-      radial-gradient(circle at top left, rgba(136, 110, 255, 0.18), transparent 36%),
-      radial-gradient(circle at 85% 14%, rgba(39, 196, 255, 0.12), transparent 28%),
-      linear-gradient(145deg, #040713 0%, #081122 42%, #040915 100%);
+    background: linear-gradient(145deg, #040713 0%, #081122 42%, #040915 100%);
+    overscroll-behavior-y: none;
+    overflow-x: hidden;
   }
 
   button,
