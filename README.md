@@ -39,7 +39,9 @@ Atlas is also explicitly moving toward a tailnet-only platform shape where Atlas
 - React
 - Vite
 - TypeScript
-- CSS
+- Tailwind CSS v4
+- React Router
+- Framer Motion
 
 ## Project Structure
 
@@ -125,7 +127,7 @@ Current version focuses on establishing the private-cloud backend baseline.
 
 Missing features include:
 
-- Frontend storage shell for list/search/upload/download flows
+- Frontend storage shell for authenticated list/search/upload/download flows
 - Encrypted identity fields at rest
 - Internal service trust for future subservices
 - Observability tooling
@@ -186,6 +188,18 @@ The intended split is:
 - future private apps consume Atlas-issued identity instead of storing user passwords themselves
 
 This is the path from "self-hosted file API" toward "private platform core" for future apps like media, photo, or document services.
+
+## Current Client Surface
+
+The client now includes:
+
+- a branded landing page at `/`
+- a placeholder docs route at `/docs`
+- a protected app route scaffold at `/app`
+- shared landing components for navbar, background motion, and glass/surface treatments
+- smooth in-page anchor navigation and viewport-triggered landing-page reveal animations
+
+This is still a product-direction shell rather than a complete storage browser, but it now reflects Atlas as a private storage, session, and trust platform instead of only exposing auth test controls.
 
 ## Development Workflow
 

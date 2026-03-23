@@ -72,20 +72,36 @@ Operational diagnostics are exposed through:
 
 The frontend is a lightweight web application responsible for:
 
-- User authentication
-- Browsing stored files
-- Uploading and downloading content
-- Interacting with the Atlas API
+- Presenting the Atlas platform direction and product surface
+- Hosting future authenticated storage flows behind a protected route shell
+- Linking the public landing/docs experience to the eventual private app experience
+- Interacting with the Atlas API as richer client flows are introduced
 
 The client communicates exclusively with the backend API.
 
 Current client baseline:
 
-- health check call to `/api/v1/health`
-- registration flow through `/api/v1/auth/register`
-- login flow through `/api/v1/auth/login`
-- refresh flow through `/api/v1/auth/refresh`
-- bearer token storage in local component state for development verification
+- route structure via `react-router-dom`
+  - `/`: public landing page
+  - `/docs`: placeholder docs route
+  - `/app`: protected app shell scaffold
+- Tailwind CSS v4-based landing UI with shared presentation components
+- animated landing-page sections using Framer Motion
+- smooth in-page anchor navigation with section offsets that account for the fixed navbar
+- global dark-theme styling and navbar shell behavior aligned with the landing experience
+
+Current shared client components introduced for the landing/app shell slice:
+
+- `Navbar`: public top navigation with compact-on-scroll behavior
+- `LiquidGlass`: reusable glassy shell wrapper used by the navbar
+- `Aurora`: animated background treatment for the landing hero
+- `ProtectedAppShell`: route guard scaffold for future authenticated application flows
+
+Current client non-goals:
+
+- no production storage-browser UI yet
+- no completed docs experience yet
+- no authenticated file upload/list/download flow rendered in the client yet
 
 ## Backend (`server`)
 
