@@ -4,6 +4,10 @@ import os
 from dataclasses import dataclass
 
 
+def _parse_csv_env(value: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     PROJECT_NAME: str
@@ -21,6 +25,7 @@ class Settings:
     IDENTITY_BLIND_INDEX_KEY: str
     IDENTITY_KEY_VERSION: str
     STORAGE_ROOT_PATH: str
+    CORS_ALLOW_ORIGINS: tuple[str, ...]
 
 
 settings = Settings(
@@ -44,4 +49,10 @@ settings = Settings(
     IDENTITY_BLIND_INDEX_KEY=os.getenv("IDENTITY_BLIND_INDEX_KEY", "dev-identity-blind-index-key"),
     IDENTITY_KEY_VERSION=os.getenv("IDENTITY_KEY_VERSION", "v1"),
     STORAGE_ROOT_PATH=os.getenv("STORAGE_ROOT_PATH", "/tmp/atlas-storage"),
+    CORS_ALLOW_ORIGINS=_parse_csv_env(
+        os.getenv(
+            "CORS_ALLOW_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173",
+        )
+    ),
 )

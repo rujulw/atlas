@@ -24,7 +24,11 @@ Current baseline progress (completed):
 - PostgreSQL + Alembic migration baseline
 - User registration, password hashing, JWT login, and auth guard baseline
 - React + Vite + TypeScript client bootstrap
-- Client integration to backend health/auth endpoints
+- Tailwind CSS v4 frontend migration
+- Public client route structure for landing/docs/app entrypoints
+- Branded landing page describing Atlas as a storage, auth, and trust platform
+- Shared landing/app-shell components (`Navbar`, `LiquidGlass`, `Aurora`, `ProtectedAppShell`)
+- Client interaction polish for smooth anchor scrolling, compact navbar behavior, and landing-page reveal animation
 - Dockerized local development stack with diagnostics
 - Owner-scoped upload/download storage pipeline with metadata persistence
 - Owner-scoped file listing, pagination, search, and metadata-query support
@@ -76,7 +80,7 @@ These features prepare Atlas for long-running production deployments.
 
 Near-term implementation priorities after the completed storage browse/search backend slice:
 
-- Build the frontend storage shell against the now-stable listing/search API surface
+- Build the authenticated storage shell inside the now-established `/app` route boundary
 - Add auth-aware session bootstrap and browse-state handling in the client
 - Expose upload, search, list, download, and empty/loading/error states in a usable file-browser UI
 - Add frontend tests for auth-shell and storage-browser interactions
@@ -92,7 +96,7 @@ Frontend-storage delivery constraints for this slice:
 Why this slice comes next:
 
 - Atlas now has the backend primitives needed for day-to-day storage browsing
-- the missing piece is a real client shell that makes those flows usable without hand-driving the API
+- the public client shell and landing surface now exist, but the authenticated storage experience still needs to be built inside `/app`
 - media-library work should build on stable browse/search primitives and a real app shell rather than on ad hoc backend-only workflows
 
 ## Private Platform Direction
@@ -113,11 +117,12 @@ What this means at the product level:
 Incremental sequence from here:
 
 1. Add owner-scoped file browsing, pagination, and search primitives on top of the existing storage metadata model.
-2. Build the frontend storage shell against those stable browse/search APIs.
-3. Add media-library metadata and service integration on top of Atlas identity and storage.
-4. Return to deeper observability and other platform-hardening work as the product surface expands.
+2. Land the public client shell and platform-direction landing experience.
+3. Build the authenticated frontend storage shell against those stable browse/search APIs.
+4. Add media-library metadata and service integration on top of Atlas identity and storage.
+5. Return to deeper observability and other platform-hardening work as the product surface expands.
 
-The first of these steps is intentionally a frontend implementation pass now that the backend browse/search contract is in place.
+The public-client shell step is now in place, so the next frontend implementation pass should move into the protected application experience rather than revisiting the marketing shell again.
 
 The intended payoff of this sequence is that Atlas becomes:
 
