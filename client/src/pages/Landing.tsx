@@ -130,7 +130,7 @@ export default function Landing(): ReactElement {
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link
                 to="/docs"
-                className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#b6f6ff_0%,#76e2ff_40%,#9f8cff_100%)] px-5 py-3 text-sm font-medium text-slate-950 shadow-[0_14px_30px_rgba(107,196,255,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(107,196,255,0.24)]"
+                className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#b6f6ff_0%,#76e2ff_40%,#9f8cff_100%)] px-5 py-3 text-sm font-medium text-slate-950 shadow-[0_14px_30px_rgba(107,196,255,0.18)] transition-opacity duration-200 hover:opacity-92"
               >
                 Read the docs
               </Link>

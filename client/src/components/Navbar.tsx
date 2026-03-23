@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import LiquidGlass from "./LiquidGlass";
 
 const navItems = [
-  { href: "#top", label: "Home" },
-  { href: "#solutions", label: "Solutions" },
-  { href: "#products", label: "Products" },
-  { href: "#resources", label: "Resources" }
+  { hash: "#top", label: "Home" },
+  { hash: "#solutions", label: "Solutions" },
+  { hash: "#products", label: "Products" },
+  { hash: "#resources", label: "Resources" }
 ] as const;
 
 export default function Navbar() {
   const [isCompact, setIsCompact] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+  const isLandingPage = location.pathname === "/";
 
   useEffect(() => {
     let previousScrollY = window.scrollY;
@@ -48,7 +51,7 @@ export default function Navbar() {
         >
           <div className="flex items-center justify-between gap-3">
             <a
-              href="#top"
+              href={isLandingPage ? "#top" : "/"}
               className="group flex min-w-0 items-center gap-3 rounded-full px-2 py-1 text-slate-50 transition-colors hover:text-white"
             >
               <div className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#9ffcff_0%,#7de7ff_42%,#b19eef_100%)] text-xs text-slate-950 shadow-[0_10px_30px_rgba(125,231,255,0.35)] transition-all duration-300">
@@ -64,9 +67,9 @@ export default function Navbar() {
             <nav className="hidden items-center gap-1 md:flex">
               {navItems.map((item) => (
                 <a
-                  key={item.href}
-                  href={item.href}
-                  className="px-3 py-2 text-sm font-medium text-slate-100/64 transition-[color,transform] duration-300 hover:scale-[1.02] hover:text-white"
+                  key={item.hash}
+                  href={item.hash === "#top" ? (isLandingPage ? "#top" : "/") : isLandingPage ? item.hash : `/${item.hash}`}
+                  className="px-3 py-2 text-sm font-medium text-slate-100/64 transition-colors duration-300 hover:text-white"
                 >
                   {item.label}
                 </a>
@@ -74,18 +77,18 @@ export default function Navbar() {
             </nav>
 
             <div className="hidden items-center gap-2 md:flex">
-              <a
-                href="#"
+              <Link
+                to="/login"
                 className="rounded-full border border-white/10 bg-white/[0.045] px-4 py-2 text-sm font-medium text-slate-100/84 transition-[border-color,background-color,color] duration-300 hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
               >
                 Log In
-              </a>
-              <a
-                href="#"
-                className="rounded-full bg-[linear-gradient(135deg,#b6f6ff_0%,#76e2ff_44%,#9f8cff_100%)] px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_10px_22px_rgba(107,196,255,0.2)] transition-transform duration-300 hover:-translate-y-0.5"
+              </Link>
+              <Link
+                to="/register"
+                className="rounded-full bg-[linear-gradient(135deg,#b6f6ff_0%,#76e2ff_44%,#9f8cff_100%)] px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_10px_22px_rgba(107,196,255,0.2)] transition-opacity duration-300 hover:opacity-92"
               >
                 Sign Up
-              </a>
+              </Link>
             </div>
 
             <button
@@ -104,21 +107,21 @@ export default function Navbar() {
               <nav className="grid gap-2">
                 {navItems.map((item) => (
                   <a
-                    key={item.href}
-                    href={item.href}
+                    key={item.hash}
+                    href={item.hash === "#top" ? (isLandingPage ? "#top" : "/") : isLandingPage ? item.hash : `/${item.hash}`}
                     className="rounded-2xl px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {item.label}
                   </a>
                 ))}
-                <a
-                  href="#"
+                <Link
+                  to="/register"
                   className="mt-1 rounded-2xl bg-[linear-gradient(135deg,#b6f6ff_0%,#76e2ff_40%,#9f8cff_100%)] px-4 py-3 text-center text-sm font-medium text-slate-950"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Sign Up
-                </a>
+                </Link>
               </nav>
             </div>
           ) : null}

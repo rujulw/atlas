@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import ProtectedAppShell from "./components/ProtectedAppShell";
 import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 function PlaceholderApp(): ReactElement {
   return <div className="min-h-screen bg-slate-950" />;
@@ -25,6 +27,8 @@ export default function App(): ReactElement {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/docs" element={<DocsPlaceholder />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route element={<ProtectedAppShell isAuthenticated={false} />}>
           <Route path="/app" element={<PlaceholderApp />} />
         </Route>
